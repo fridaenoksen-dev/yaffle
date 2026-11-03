@@ -79,7 +79,7 @@ const S = {
   db:null, user:null, assets:null, me:null, canWrite:true,
   trip:null, items:[], ideas:[], members:{}, profiles:{},
   loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
-  view: ['plan','ideer','papirer'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'plan',
+  view: ['plan','ideer','penger','papirer'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'plan',
   filter:'all', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
@@ -193,7 +193,7 @@ async function refreshProfiles(){
 
 window.addEventListener('hashchange', () => {
   const v = location.hash.slice(1);
-  if (['plan','ideer','papirer'].includes(v) && v !== S.view){ S.view = v; render(); }
+  if (['plan','ideer','penger','papirer'].includes(v) && v !== S.view){ S.view = v; render(); }
 });
 function go(v){ S.view = v; try { history.replaceState(null, '', '#' + v); } catch(e){ location.hash = v; } render(); }
 
@@ -233,6 +233,7 @@ function view(){
   out.push(...tabs());
   if (S.view === 'plan') out.push(...planView());
   else if (S.view === 'ideer') out.push(...boardView());
+  else if (S.view === 'penger') out.push(...moneyView());
   else out.push(...papersView());
   if (S.canWrite){
     if (S.view === 'plan') out.push(h('button', {class:'btn primary fab', onclick:() => itemSheet(null, tripDays()[0])}, '+ Legg til booking'));
@@ -285,31 +286,108 @@ function countdown(){
 
 function summary(){
   const cd = countdown();
-  const toBook = S.items.filter(i => i.booked === 'no').length;
-  const unpaid = S.items.filter(i => i.pay === 'unpaid').length;
-  const unknown = S.items.filter(i => i.pay === 'unknown').length;
-  const totals = {};
-  S.items.forEach(i => { const c = Number(i.cost); if (c > 0){ const k = i.currency || 'NOK'; totals[k] = (totals[k] || 0) + c; } });
-  const tot = Object.entries(totals);
-  return h('section', {class:'summary', 'aria-label':'Oversikt'},
-    h('div', {class:'big'}, cd.big, cd.small ? h('small', null, cd.small) : null),
-    h('div', {class:'stats'},
-      h('div', {class:'stat' + (toBook ? ' alert' : '')}, h('b', null, toBook), h('span', null, 'må bookes')),
-      h('div', {class:'stat' + (unpaid ? ' alert' : '')}, h('b', null, unpaid), h('span', null, 'ikke betalt')),
-      h('div', {class:'stat'}, h('b', null, unknown), h('span', null, 'betalt? sjekk'))
-    ),
-    h('div', {class:'money'}, tot.length
-      ? tot.map(([c, n], i) => [i ? ' · ' : '', 'Totalt ', h('b', null, money(n, c)), ' (ca. ', money(Math.round(n / groupSize()), c), ' per person)'])
-      : 'Legg inn pris på bookingene, så regner Yaffle ut hva det blir per person.')
-  );
+  return h('section', {class:'summary', 'aria-label':'Nedtelling'},
+    h('div', {class:'big'}, cd.big, cd.small ? h('small', null, cd.small) : null));
+}
+
+/* ---------- penger ---------- */
+function moneyData(){
+  const n = groupSize(); const ids = memberIds();
+  const byCur = {};
+  for (const i of S.items){
+    const c = Number(i.cost); if (!(c > 0)) continue;
+    const cur = i.currency || 'NOK';
+    const m = byCur[cur] || (byCur[cur] = {total:0, paid:0, unpaid:0, unknown:0, paidBy:{}, noPayer:0});
+    m.total += c;
+    if (i.pay === 'paid'){ m.paid += c; if (i.paidBy) m.paidBy[i.paidBy] = (m.paidBy[i.paidBy] || 0) + c; else m.noPayer += c; }
+    else if (i.pay === 'unpaid') m.unpaid += c; else m.unknown += c;
+  }
+  // Hvem skylder hvem: alt deles likt på alle som er med
+  for (const m of Object.values(byCur)){
+    const share = m.total / n; m.share = share; m.transfers = [];
+    if (m.noPayer > 0 || ids.length < n) continue;
+    const bal = ids.map(id => ({id, v: (m.paidBy[id] || 0) - share}));
+    const debt = bal.filter(x => x.v < -0.5).sort((a, b) => a.v - b.v);
+    const cred = bal.filter(x => x.v > 0.5).sort((a, b) => b.v - a.v);
+    let i = 0, j = 0;
+    while (i < debt.length && j < cred.length){
+      const amt = Math.min(-debt[i].v, cred[j].v);
+      m.transfers.push({from: debt[i].id, to: cred[j].id, amt});
+      debt[i].v += amt; cred[j].v -= amt;
+      if (debt[i].v > -0.5) i++; if (cred[j].v < 0.5) j++;
+    }
+  }
+  return byCur;
+}
+
+function moneyView(){
+  const data = moneyData(); const curs = Object.keys(data);
+  const costItems = S.items.filter(i => Number(i.cost) > 0).sort((a, b) => sortKey({...a, time:(a.date||'') + (a.time||'')}) < sortKey({...b, time:(b.date||'') + (b.time||'')}) ? -1 : 1);
+  const todo = S.items.filter(i => i.booked === 'no' || i.pay === 'unpaid' || i.pay === 'unknown');
+  const noPayer = S.items.filter(i => i.pay === 'paid' && Number(i.cost) > 0 && !i.paidBy);
+  const out = [];
+
+  if (!curs.length) return [h('div', {class:'empty'}, h('h3', null, 'Ingen priser ennå'), h('p', null, 'Legg inn pris på bookingene i planen, så regner Yaffle ut totalen, hva det blir per person og hvem som skylder hvem.'))];
+
+  out.push(h('div', {class:'moneygrid'}, curs.map(cur => {
+    const m = data[cur];
+    return h('section', {class:'moneycard'},
+      h('div', {class:'kicker'}, 'Totalt i ' + cur),
+      h('div', {class:'moneybig'}, money(Math.round(m.total), cur)),
+      h('div', {class:'moneysub'}, 'ca. ', h('b', null, money(Math.round(m.share), cur)), ' per person'),
+      h('div', {class:'bar', role:'img', 'aria-label': Math.round(m.paid / m.total * 100) + ' % betalt'}, h('span', {style:'width:' + (m.paid / m.total * 100) + '%'})),
+      h('div', {class:'moneyrow'}, h('span', null, 'Betalt'), h('b', null, money(Math.round(m.paid), cur))),
+      m.unpaid ? h('div', {class:'moneyrow'}, h('span', null, 'Ikke betalt'), h('b', {style:'color:var(--red)'}, money(Math.round(m.unpaid), cur))) : null,
+      m.unknown ? h('div', {class:'moneyrow'}, h('span', null, 'Betalt?'), h('b', {style:'color:var(--amber)'}, money(Math.round(m.unknown), cur))) : null
+    );
+  })));
+
+  // Gjøre opp
+  const settle = h('section', {class:'moneysection'}, h('h3', null, 'Gjøre opp'));
+  if (noPayer.length || memberIds().length < groupSize()){
+    settle.append(h('p', {class:'muted', style:'margin:0 0 12px'}, noPayer.length
+      ? 'Velg hvem som betalte, så regner Yaffle ut hvem som skylder hvem. Alt deles likt på ' + groupSize() + '.'
+      : 'Venter på at alle ' + groupSize() + ' har logget inn, så regner Yaffle ut hvem som skylder hvem.'));
+    if (noPayer.length && memberIds().length) settle.append(h('div', {class:'stack'}, noPayer.map(i => h('div', {class:'payrow'},
+      h('div', null, h('b', null, i.title), h('span', {class:'muted'}, ' · ' + money(Number(i.cost), i.currency))),
+      S.canWrite ? h('select', {class:'dayselect', 'aria-label':'Hvem betalte ' + i.title, onchange: e => e.target.value && write('items/' + i.id, () => S.db.doc('items/' + i.id).update({paidBy: e.target.value}))},
+        h('option', {value:''}, 'Hvem betalte?'), memberIds().map(id => h('option', {value:id}, nameOf(id)))) : null))));
+  } else {
+    const all = curs.flatMap(cur => data[cur].transfers.map(t => ({...t, cur})));
+    settle.append(all.length ? h('div', {class:'stack'}, all.map(t => h('div', {class:'payrow'},
+      h('div', {style:'display:flex;align-items:center;gap:8px;flex-wrap:wrap'}, face(t.from, true), h('b', null, nameOf(t.from)), h('span', {class:'muted'}, 'betaler'), face(t.to, true), h('b', null, nameOf(t.to))),
+      h('b', {style:'font-variant-numeric:tabular-nums'}, money(Math.round(t.amt), t.cur)))))
+      : h('p', {class:'muted', style:'margin:0'}, 'Dere er skuls! Alle har betalt like mye.'));
+  }
+  out.push(settle);
+
+  // Hver person
+  if (memberIds().length) out.push(h('section', {class:'moneysection'}, h('h3', null, 'Hva hver har lagt ut'),
+    h('div', {class:'stack'}, memberIds().map(id => h('div', {class:'payrow'},
+      h('div', {style:'display:flex;align-items:center;gap:8px'}, face(id, true), h('b', null, nameOf(id))),
+      h('span', {style:'font-variant-numeric:tabular-nums'}, curs.map((cur, k) => [k ? ' · ' : '', money(Math.round(data[cur].paidBy[id] || 0), cur)])))))));
+
+  // Gjenstår
+  out.push(h('section', {class:'moneysection'}, h('h3', null, 'Gjenstår'),
+    todo.length ? h('div', {class:'stack'}, todo.map(i => h('div', {class:'payrow'},
+      h('div', null, h('b', null, i.title), h('span', {class:'muted'}, isoDate(i.date) ? ' · ' + dayLabel(i.date, true) : '')),
+      h('div', {style:'display:flex;gap:6px;flex-wrap:wrap'}, i.booked === 'no' ? bookedPill(i) : null, i.pay === 'unpaid' || i.pay === 'unknown' ? payPill(i) : null))))
+    : h('p', {class:'muted', style:'margin:0'}, 'Alt er booket og betalt. 🎉')));
+
+  // Alle kostnader
+  out.push(h('section', {class:'moneysection'}, h('h3', null, 'Alle kostnader'),
+    h('div', {class:'stack'}, costItems.map(i => h('div', {class:'payrow'},
+      h('div', null, h('b', null, i.title), h('span', {class:'muted'}, (isoDate(i.date) ? ' · ' + dayLabel(i.date, true) : '') + (i.pay === 'paid' && i.paidBy ? ' · betalt av ' + nameOf(i.paidBy) : ''))),
+      h('div', {style:'text-align:right;font-variant-numeric:tabular-nums'}, h('b', null, money(Number(i.cost), i.currency)), h('div', {class:'muted', style:'font-size:13px'}, money(Math.round(Number(i.cost) / groupSize()), i.currency) + ' hver')))))));
+  return out;
 }
 
 function tabs(){
   const nIdeas = S.ideas.filter(i => !isoDate(i.day) || !tripDays().includes(i.day)).length;
   const nFiles = S.items.reduce((a, i) => a + (i.attachments || []).length, 0);
   const t = (id, label, n) => h('button', {class:'tab', role:'tab', 'aria-selected': String(S.view === id), onclick:() => go(id)}, label, n ? h('sup', null, n) : null);
-  const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Trykk på et kort for detaljer, gi hjerter, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.'};
-  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('papirer','Papirer', nFiles)), h('p', {class:'tabhint'}, hints[S.view])];
+  const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Trykk på et kort for detaljer, gi hjerter, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.', penger:'Hva turen koster, hva som er betalt, og hvem som skylder hvem.'};
+  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('penger','Penger'), t('papirer','Papirer', nFiles)), h('p', {class:'tabhint'}, hints[S.view])];
 }
 
 /* ---------- plan ---------- */
