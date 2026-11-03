@@ -467,7 +467,6 @@ function planView(){
   const scroller = h('div', {class:'hscroll', id:'plan-scroll', tabindex:'0', 'aria-label':'Reiseplan per dag'}, cols);
   const jump = idx => { const col = scroller.children[idx]; if (col) scroller.scrollTo({left: col.offsetLeft - scroller.children[0].offsetLeft, behavior:'smooth'}); };
   const chips = h('div', {class:'daychips-row', role:'group', 'aria-label':'Gå til dag'},
-    h('button', {class:'taxi-chip', onclick:() => taxiScreen()}, h('span', {svg:ICONS.taxi, style:'display:inline-flex'}), 'Taxi'),
     days.map((d, idx) => h('button', {class: d === todayIso ? 'today' : null, onclick:() => jump(idx)}, dayLabel(d, true))));
   if (!S.jumpedToday && days.includes(todayIso)){ S.jumpedToday = true; setTimeout(() => jump(days.indexOf(todayIso)), 60); }
   return [days.length > 1 ? chips : null, scroller];
