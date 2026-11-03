@@ -78,8 +78,8 @@ const sheetBody = document.getElementById('sheetBody');
 const S = {
   db:null, user:null, assets:null, me:null, canWrite:true,
   trip:null, items:[], ideas:[], members:{}, profiles:{},
-  loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
-  view: ['plan','ideer','penger','papirer'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'plan',
+  packing:[], personal:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
+  view: ['plan','ideer','pakk','penger','papirer'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'plan',
   filter:'all', boardMode:'tavle', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
@@ -164,6 +164,8 @@ render();
     done('ideas', s); render();
     if (detailId && sheet.open) ideaDetail(detailId);
   }, onErr('ideas'));
+  db.collection('packing').onSnapshot(s => { S.packing = s.docs.map(d => ({id:d.id, ...d.data()})); render(); }, () => {});
+  db.collection('personal').onSnapshot(s => { S.personal = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); render(); }, () => {});
   db.collection('members').onSnapshot(s => {
     S.members = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
     done('members', s);
@@ -197,7 +199,7 @@ async function refreshProfiles(){
 
 window.addEventListener('hashchange', () => {
   const v = location.hash.slice(1);
-  if (['plan','ideer','penger','papirer'].includes(v) && v !== S.view){ S.view = v; render(); }
+  if (['plan','ideer','pakk','penger','papirer'].includes(v) && v !== S.view){ S.view = v; render(); }
 });
 function go(v){ S.view = v; try { history.replaceState(null, '', '#' + v); } catch(e){ location.hash = v; } render(); }
 
@@ -237,6 +239,7 @@ function view(){
   out.push(...tabs());
   if (S.view === 'plan') out.push(...planView());
   else if (S.view === 'ideer') out.push(...boardView());
+  else if (S.view === 'pakk') out.push(...packView());
   else if (S.view === 'penger') out.push(...moneyView());
   else out.push(...papersView());
   if (S.canWrite){
@@ -326,7 +329,8 @@ function hero(){
   return h('header', {class:'hero'},
     h('div', {class:'hero-title'},
       h('h1', null, t.title || 'Turen'),
-      h('span', {class:'countpill' + (cd.live ? ' live' : '')}, cd.pill)),
+      h('span', {class:'countpill' + (cd.live ? ' live' : '')}, cd.pill),
+      cd.daysTo != null && cd.daysTo <= 5 && cd.daysTo >= 0 && packLeft() ? h('button', {class:'countpill todo', onclick:() => go('pakk')}, packLeft() + ' igjen å pakke') : null),
     h('div', {class:'sub'},
       h('span', null, [t.note, range].filter(Boolean).join(' · ')),
       ids.length ? h('button', {class:'stack-btn', 'aria-label':'Se gjengen', onclick:() => crewSheet()},
@@ -349,8 +353,8 @@ function countdown(){
   const now = new Date(); const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12));
   const diff = Math.round((D(days[0]) - today) / 864e5);
   const left = Math.round((D(days[days.length-1]) - today) / 864e5);
-  if (diff > 1) return {big: diff + ' dager', small:'til dere drar til ' + (S.trip.title || 'turen'), pill:'om ' + diff + ' dager'};
-  if (diff === 1) return {big:'I morgen!', small:'Pakk sekken', pill:'i morgen!', live:true};
+  if (diff > 1) return {big: diff + ' dager', small:'til dere drar til ' + (S.trip.title || 'turen'), pill:'om ' + diff + ' dager', daysTo:diff};
+  if (diff === 1) return {big:'I morgen!', small:'Pakk sekken', pill:'i morgen!', live:true, daysTo:1};
   if (left >= 0) return {big:'Dag ' + (1 - diff) + ' av ' + days.length, small:'God tur!', pill:'dag ' + (1 - diff) + ' av ' + days.length, live:true};
   return {big:'Hjemme igjen', small:'Håper det var en fin tur', pill:'hjemme igjen'};
 }
@@ -416,7 +420,7 @@ function tabs(){
   const nFiles = S.items.reduce((a, i) => a + (i.attachments || []).length, 0);
   const t = (id, label, n) => h('button', {class:'tab', role:'tab', 'aria-selected': String(S.view === id), onclick:() => go(id)}, label, n ? h('sup', null, n) : null);
   const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Gi hjerte til det du vil gjøre, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.', penger:'Hva turen koster, regnet om til kroner.'};
-  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('penger','Penger'), t('papirer','Papirer', nFiles))];
+  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('pakk','Pakk', packLeft() || null), t('penger','Penger'), t('papirer','Papirer', nFiles))];
 }
 
 /* ---------- plan ---------- */
@@ -439,6 +443,7 @@ function planView(){
         h('div', {class:'dayname'}, cap(WD[d.getUTCDay()]), h('span', null, 'Dag ' + (idx+1))),
         idx === 0 ? h('span', {class:'daytag'}, 'Avreise') : idx === days.length - 1 ? h('span', {class:'daytag'}, 'Hjemreise') : null
       ),
+      weatherLine(day),
       h('div', {class:'stack', style:'flex:1;align-content:start'},
         sleeping.map(s => h('div', {class:'sleep'}, h('span', {class:'tile stay', style:'width:24px;height:24px;border-radius:8px', svg:ICONS.stay}), 'Dere bor på ', h('b', {style:'color:var(--ink)'}, s.title))),
         entries.map(e => e.type === 'item' ? itemCard(e.x) : plannedIdeaCard(e.x)),
@@ -456,6 +461,7 @@ function planView(){
   const scroller = h('div', {class:'hscroll', id:'plan-scroll', tabindex:'0', 'aria-label':'Reiseplan per dag'}, cols);
   const jump = idx => { const col = scroller.children[idx]; if (col) scroller.scrollTo({left: col.offsetLeft - scroller.children[0].offsetLeft, behavior:'smooth'}); };
   const chips = h('div', {class:'daychips-row', role:'group', 'aria-label':'Gå til dag'},
+    h('button', {class:'taxi-chip', onclick:() => taxiScreen()}, h('span', {svg:ICONS.taxi, style:'display:inline-flex'}), 'Taxi'),
     days.map((d, idx) => h('button', {class: d === todayIso ? 'today' : null, onclick:() => jump(idx)}, dayLabel(d, true))));
   if (!S.jumpedToday && days.includes(todayIso)){ S.jumpedToday = true; setTimeout(() => jump(days.indexOf(todayIso)), 60); }
   return [days.length > 1 ? chips : null, scroller];
@@ -503,7 +509,8 @@ function itemCard(i){
       ) : null
     ),
     S.canWrite ? h('button', {class:'iconbtn edit', onclick:() => itemSheet(i)}, 'Endre') : h('span'),
-    (bookedPill(i) || payPill(i)) ? h('div', {class:'pills'}, bookedPill(i), payPill(i)) : null,
+    (bookedPill(i) || payPill(i) || i.kind === 'taxi' || i.kind === 'stay') ? h('div', {class:'pills'}, bookedPill(i), payPill(i),
+      i.kind === 'taxi' || i.kind === 'stay' ? h('button', {class:'pill neutral', onclick:() => taxiScreen(/→\s*flyplass/i.test(i.title || '') ? 'airport' : 'home')}, h('span', {svg:ICONS.taxi, style:'display:inline-flex'}), 'Vis taxisjåføren') : null) : null,
     (atts.length || S.assets) ? h('div', {class:'files'},
       atts.map(fileChip),
       S.assets && S.canWrite ? h('label', {class:'attach'}, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), atts.length ? 'Legg ved mer' : 'Legg ved kvittering', input) : null
@@ -788,6 +795,125 @@ async function geocode(q){
     if (r.ok){ const j = await r.json(); const c = j && j.features && j.features[0] && j.features[0].geometry.coordinates; if (c) return {lat: c[1], lng: c[0]}; }
   } catch(e){}
   return null;
+}
+
+
+/* ---------- været (Open-Meteo, gratis og uten nøkkel) ---------- */
+const WX = {byDate:{}, loaded:false, loading:false};
+function loadWeather(){
+  if (WX.loaded || WX.loading) return; WX.loading = true;
+  const st = S.items.find(i => i.kind === 'stay' && i.lat != null && i.lat !== '' && Number.isFinite(Number(i.lat)));
+  const lat = st ? Number(st.lat) : 54.352, lng = st ? Number(st.lng) : 18.6466;
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lng + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Europe%2FWarsaw&forecast_days=16')
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      const d = j && j.daily; if (!d) return;
+      d.time.forEach((t, k) => { WX.byDate[t] = {code:d.weather_code[k], max:d.temperature_2m_max[k], min:d.temperature_2m_min[k], rain:d.precipitation_probability_max[k]}; });
+      WX.loaded = true; render();
+    }).catch(() => {}).finally(() => { WX.loading = false; });
+}
+const WX_ICONS = {
+  sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  cloud:'<svg viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18z"/></svg>',
+  rain:'<svg viewBox="0 0 24 24"><path d="M7 15h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 6.5 4.3 4.3 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/></svg>',
+  snow:'<svg viewBox="0 0 24 24"><path d="M7 15h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 6.5 4.3 4.3 0 0 0 7 15z"/><path d="M8 19h.01M12 21h.01M16 19h.01"/></svg>',
+  fog:'<svg viewBox="0 0 24 24"><path d="M4 10h16M3 14h18M6 18h12"/></svg>'
+};
+function wxKind(code){
+  if (code === 0 || code === 1) return ['sun', code === 0 ? 'Sol' : 'Mest sol'];
+  if (code === 2 || code === 3) return ['cloud', code === 2 ? 'Delvis skyet' : 'Overskyet'];
+  if (code === 45 || code === 48) return ['fog', 'Tåke'];
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return ['snow', 'Snø'];
+  return ['rain', code >= 95 ? 'Torden' : (code >= 51 && code <= 57) ? 'Yr' : 'Regn'];
+}
+function weatherLine(day){
+  loadWeather();
+  const w = WX.byDate[day];
+  if (!w) return WX.loaded ? h('div', {class:'wx muted'}, 'Værmeldingen kommer ca. to uker før') : null;
+  const [k, label] = wxKind(w.code);
+  return h('div', {class:'wx', title:label},
+    h('span', {class:'wx-ic', svg:WX_ICONS[k]}),
+    h('b', null, Math.round(w.max) + '°'), h('span', {class:'muted'}, '/ ' + Math.round(w.min) + '°'),
+    h('span', null, label),
+    w.rain != null ? h('span', {class:'muted'}, w.rain + ' % sjanse for nedbør') : null);
+}
+
+/* ---------- vis taxisjåføren ---------- */
+const AIRPORT = {name:'Port Lotniczy Gdańsk im. Lecha Wałęsy', address:'ul. Juliusza Słowackiego 200, 80-298 Gdańsk', code:'GDN'};
+function taxiScreen(start){
+  const st = S.items.find(i => i.kind === 'stay');
+  const home = st ? {name: String(st.title || '').split('–')[0].trim(), address: stayAddress(st)} : null;
+  let target = start === 'airport' || !home ? 'airport' : 'home';
+  const dlg = h('dialog', {class:'taxi', 'aria-label':'Vis taxisjåføren'});
+  const draw = () => {
+    const t = target === 'home' ? home : AIRPORT;
+    dlg.replaceChildren(
+      h('div', {class:'taxi-top'},
+        h('div', {class:'seg', role:'group', 'aria-label':'Hvor skal dere?'},
+          home ? h('button', {'aria-pressed': String(target === 'home'), onclick:() => { target = 'home'; draw(); }}, 'Til leiligheten') : null,
+          h('button', {'aria-pressed': String(target === 'airport'), onclick:() => { target = 'airport'; draw(); }}, 'Til flyplassen')),
+        h('button', {class:'close', style:'position:static', 'aria-label':'Lukk', onclick:() => dlg.close()}, '×')),
+      h('div', {class:'taxi-body', lang:'pl'},
+        h('p', {class:'taxi-ask'}, target === 'home' ? 'Dzień dobry! Proszę nas zawieźć pod ten adres:' : 'Dzień dobry! Proszę nas zawieźć na lotnisko:'),
+        h('p', {class:'taxi-name'}, t.name),
+        h('p', {class:'taxi-addr'}, t.address),
+        target === 'airport' ? h('p', {class:'taxi-code'}, 'Lotnisko ' + AIRPORT.code) : null,
+        h('p', {class:'taxi-thanks'}, 'Dziękujemy!')),
+      h('p', {class:'taxi-foot', lang:'nb'}, (target === 'home' ? '«Hei! Kan du kjøre oss til denne adressen?»' : '«Hei! Kan du kjøre oss til flyplassen?»') + ' Snu skjermen mot sjåføren.')
+    );
+  };
+  draw();
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+}
+
+/* ---------- huskeliste ---------- */
+const PERSONAL_SUGGESTIONS = ['Pass eller nasjonalt ID-kort', 'Bankkort', 'Litt złoty i kontanter', 'Ryanair-appen med boardingkort', 'Europeisk helsetrygdkort', 'Mobillader', 'Toalettsaker under 100 ml', 'Varm jakke og paraply', 'Gode sko'];
+const SHARED_SUGGESTIONS = ['Hårføner', 'Rettetang', 'Powerbank', 'Kortstokk eller spill', 'Høyttaler'];
+function myList(){ return (S.me && S.personal[S.me] && S.personal[S.me].items) || []; }
+function packLeft(){ return myList().filter(x => !x.done).length; }
+async function saveMyList(items){
+  if (!S.me) return;
+  await write('personal/' + S.me, () => S.db.doc('personal/' + S.me).set({items}));
+}
+function addRow(id, placeholder, onAdd){
+  const inp = h('input', {class:'input', id, placeholder, maxlength:'80'});
+  const add = async () => { const v = inp.value.trim(); if (!v) return inp.focus(); inp.value = ''; await onAdd(v); };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
+  return h('div', {class:'quickadd'}, inp, h('button', {class:'btn dark', type:'button', onclick:add}, 'Legg til'));
+}
+function packView(){
+  const mine = myList();
+  const done = mine.filter(x => x.done).length;
+  const shared = S.packing.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const addShared = async v => { const ref = S.db.collection('packing').doc(); await write('packing/' + ref.id, () => ref.set({text:v, by:null, createdAt:Date.now(), addedBy:S.me || null})); };
+  return [
+    h('section', {class:'moneysection'},
+      h('div', {style:'display:flex;justify-content:space-between;align-items:baseline;gap:12px'}, h('h3', null, 'Min liste'),
+        mine.length ? h('span', {class:'muted', style:'font-size:14px;font-variant-numeric:tabular-nums'}, done + ' av ' + mine.length + ' pakket') : null),
+      mine.length ? h('div', {class:'bar', style:'margin:0 0 12px'}, h('span', {style:'width:' + (done / mine.length * 100) + '%'})) : null,
+      S.canWrite && S.me ? addRow('pack-mine', 'Legg til noe du må huske …', v => saveMyList([...myList(), {id:Date.now().toString(36), text:v, done:false}])) : null,
+      mine.length ? h('div', {class:'checklist'}, mine.map(x => h('label', {class:'check' + (x.done ? ' done' : '')},
+        h('input', {type:'checkbox', checked: x.done || null, onchange: e => saveMyList(myList().map(y => y.id === x.id ? {...y, done: e.target.checked} : y))}),
+        h('span', null, x.text),
+        h('button', {class:'check-del', type:'button', 'aria-label':'Fjern ' + x.text, onclick: e => { e.preventDefault(); saveMyList(myList().filter(y => y.id !== x.id)); }}, '×'))))
+      : h('div', {class:'empty'}, h('p', null, 'Listen din er tom.'),
+          S.canWrite && S.me ? h('button', {class:'btn ghost', style:'margin-top:12px', onclick:() => saveMyList(PERSONAL_SUGGESTIONS.map((t, k) => ({id:'s' + k, text:t, done:false})))}, 'Bruk forslag til liste') : null)
+    ),
+    h('section', {class:'moneysection'},
+      h('h3', null, 'Felles'),
+      h('p', {class:'muted', style:'margin:-6px 0 12px;font-size:14px'}, 'Ting bare én trenger å ta med.'),
+      S.canWrite ? addRow('pack-shared', 'F.eks. hårføner', addShared) : null,
+      shared.length ? h('div', {class:'stack'}, shared.map(x => h('div', {class:'payrow'},
+        h('b', null, x.text),
+        h('div', {style:'display:flex;align-items:center;gap:8px'},
+          x.by ? [face(x.by, true), h('span', {class:'muted', style:'font-size:14px'}, x.by === S.me ? 'Du tar med' : nameOf(x.by) + ' tar med')] : null,
+          S.canWrite && S.me ? h('button', {class:'pill ' + (x.by === S.me ? 'ok' : 'neutral'), onclick:() => write('packing/' + x.id, () => S.db.doc('packing/' + x.id).update({by: x.by === S.me ? null : S.me}))}, x.by === S.me ? 'Angre' : x.by ? 'Jeg tar med i stedet' : 'Jeg tar med') : null,
+          S.canWrite ? h('button', {class:'check-del', type:'button', 'aria-label':'Fjern ' + x.text, onclick:() => write('packing/' + x.id, () => S.db.doc('packing/' + x.id).delete())}, '×') : null))))
+      : h('div', {class:'empty'}, h('p', null, 'Ingen felles ting ennå.'),
+          S.canWrite ? h('button', {class:'btn ghost', style:'margin-top:12px', onclick: async () => { for (const t of SHARED_SUGGESTIONS) await addShared(t); }}, 'Bruk forslag') : null)
+    )
+  ];
 }
 
 async function addIdea(data){
