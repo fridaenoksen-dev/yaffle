@@ -532,8 +532,11 @@ function boardView(){
   const planned = i => isoDate(i.day) && days.includes(i.day);
   let list = S.ideas.slice();
   if (S.filter === 'open') list = list.filter(i => !planned(i));
-  if (S.filter === 'allin') list = list.filter(isAllIn);
-  list.sort((a, b) => (planned(a) - planned(b)) || (heartsOf(b).length - heartsOf(a).length) || ((a.createdAt || 0) - (b.createdAt || 0)));
+  if (S.filter === 'planned') list = list.filter(planned);
+  const when = i => planned(i) ? i.day + ' ' + (i.time || '99:99') : '';
+  list.sort((a, b) => S.filter === 'planned'
+    ? (when(a) < when(b) ? -1 : when(a) > when(b) ? 1 : 0)
+    : ((a.createdAt || 0) - (b.createdAt || 0)));
 
   const quick = S.canWrite ? (() => {
     const inp = h('input', {class:'input', id:'quick-idea', placeholder:'Fest en idé på tavla …', maxlength:'120', 'aria-label':'Ny idé'});
@@ -552,7 +555,7 @@ function boardView(){
     h('p', null, S.ideas.length ? 'Prøv et annet filter.' : 'Fest det første forslaget, for eksempel en kafé eller en dagstur.'));
 
   const mode = (id, label) => h('button', {'aria-pressed': String(S.boardMode === id), onclick:() => { S.boardMode = id; render(); }}, label);
-  const bar = h('div', {class:'boardbar'}, h('div', {class:'seg', role:'group', 'aria-label':'Visning'}, mode('tavle','Tavle'), mode('kart','Kart')), h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('allin','Alle er med')));
+  const bar = h('div', {class:'boardbar'}, h('div', {class:'seg', role:'group', 'aria-label':'Visning'}, mode('tavle','Tavle'), mode('kart','Kart')), h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('planned','Planlagt')));
   if (S.boardMode === 'kart') return [quick, bar, ...mapView(list)];
   return [quick, bar, drops, grid];
 }
