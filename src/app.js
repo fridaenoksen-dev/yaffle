@@ -684,6 +684,7 @@ function mapView(list){
   const placed = list.filter(hasPos);
   const missing = list.filter(i => !hasPos(i));
   const stays = S.items.filter(i => i.kind === 'stay' && hasPos(i));
+  locateStays();
   loadLeaflet().then(L => {
     if (!map){
       map = L.map(mapEl, {scrollWheelZoom:false, zoomControl:true});
@@ -694,8 +695,10 @@ function mapView(list){
     markerLayer.clearLayers();
     const pts = [];
     for (const s of stays){
-      const m = L.marker([Number(s.lat), Number(s.lng)], {icon: L.divIcon({className:'', html:'<span class="mk mk-home">' + ICONS.stay + '</span>', iconSize:[34, 34], iconAnchor:[17, 17]}), title:s.title, keyboard:true});
-      m.bindTooltip(s.title); markerLayer.addLayer(m); pts.push([Number(s.lat), Number(s.lng)]);
+      const m = L.marker([Number(s.lat), Number(s.lng)], {icon: L.divIcon({className:'', html:'<span class="mk-home-wrap"><span class="mk-pulse"></span><span class="mk mk-home">' + ICONS.stay + '</span></span>', iconSize:[48, 48], iconAnchor:[24, 24]}), title:'Her bor dere: ' + s.title, keyboard:true, zIndexOffset:1000});
+      const label = document.createElement('span'); label.textContent = 'Her bor dere';
+      m.bindTooltip(label, {permanent:true, direction:'bottom', offset:[0, 20], className:'home-label'});
+      m.on('click', () => itemSheet(s)); markerLayer.addLayer(m); pts.push([Number(s.lat), Number(s.lng)]);
     }
     for (const i of placed){
       const [cname, c] = catOf(i.category);
@@ -709,8 +712,28 @@ function mapView(list){
     const near = home ? pts.filter(p => Math.hypot((p[0] - home[0]) * 111, (p[1] - home[1]) * 65) < 5) : [];
     setTimeout(() => { map.invalidateSize(); if (!mapFitted && pts.length){ map.fitBounds(near.length > 1 ? near : pts, {padding:[40, 40], maxZoom:16}); mapFitted = true; } }, 50);
   }).catch(() => { mapEl.textContent = 'Kartet kunne ikke lastes. Sjekk nettet.'; });
+  const homeStay = stays[0];
   return [mapEl,
+    h('div', {class:'maptools'},
+      homeStay ? h('button', {class:'pill neutral', onclick:() => { if (map) map.setView([Number(homeStay.lat), Number(homeStay.lng)], 16); }}, h('span', {class:'mk mk-home', style:'width:20px;height:20px;box-shadow:none', svg:ICONS.stay}), 'Vis hvor dere bor')
+        : h('span', {class:'muted', style:'font-size:14px'}, 'Legg inn adressen på overnattingen i planen, så vises den på kartet.'),
+      h('button', {class:'pill neutral', onclick:() => { mapFitted = false; render(); }}, 'Vis alle')),
     missing.length ? h('div', {class:'notice'}, h('span', null, 'Uten sted: ' + missing.map(i => i.title).join(', ') + '.'), h('span', {class:'muted'}, 'Legg inn adresse på idéen for å få den på kartet.')) : null];
+}
+
+const stayTried = new Set();
+function stayAddress(i){
+  if (i.place) return i.place;
+  const first = String(i.details || '').split('\n')[0].replace(/\(.*?\)/g, '').replace(/\.$/, '').trim();
+  return /\d/.test(first) ? first : i.title;
+}
+async function locateStays(){
+  if (!S.canWrite) return;
+  for (const i of S.items.filter(x => x.kind === 'stay' && !hasPos(x) && !stayTried.has(x.id))){
+    stayTried.add(i.id);
+    const pos = await geocode(stayAddress(i));
+    if (pos) await write('items/' + i.id, () => S.db.doc('items/' + i.id).update({lat:pos.lat, lng:pos.lng}));
+  }
 }
 
 async function geocode(q){
@@ -806,6 +829,7 @@ function itemSheet(item, day){
   const time = h('input', {class:'input', type:'time', value: it.time || ''});
   const details = h('textarea', {class:'input', placeholder:'Tider, adresse, hvem kjører …', maxlength:'1000'}, it.details || '');
   const ref = h('input', {class:'input', value: it.ref || '', placeholder:'Bookingnummer', maxlength:'60'});
+  const place = h('input', {class:'input', value: it.place || '', placeholder:'Brukes til kartet', maxlength:'200'});
   const cost = h('input', {class:'input', type:'number', inputmode:'decimal', min:'0', step:'1', value: it.cost != null && it.cost !== '' ? String(it.cost) : '', placeholder:'0'});
   const currency = h('select', {class:'input'}, Object.keys(CUR).map(c => h('option', {value:c, selected: (it.currency || 'NOK') === c}, c)));
   const booked = h('select', {class:'input'}, [['yes','Booket'],['no','Må bookes'],['na','Ikke relevant']].map(([v,l]) => h('option', {value:v, selected: (it.booked || 'yes') === v}, l)));
@@ -819,7 +843,11 @@ function itemSheet(item, day){
     e.preventDefault();
     if (!title.value.trim()){ title.focus(); return; }
     const data = {kind, title:title.value.trim(), date:date.value || '', endDate:endDate.value || '', time:time.value || '', details:details.value.trim(), ref:ref.value.trim(),
-      cost: cost.value === '' ? null : Math.max(0, Number(cost.value) || 0), currency:currency.value, booked:booked.value, pay:pay.value, paidBy: pay.value === 'paid' ? (paidBy.value || null) : null};
+      cost: cost.value === '' ? null : Math.max(0, Number(cost.value) || 0), currency:currency.value, booked:booked.value, pay:pay.value, paidBy: pay.value === 'paid' ? (paidBy.value || null) : null, place: place.value.trim()};
+    if (data.place && (data.place !== (it.place || '') || !hasPos(it))){
+      const pos = await geocode(data.place);
+      if (pos){ data.lat = pos.lat; data.lng = pos.lng; } else toast('Fant ikke adressen på kartet. Prøv å skrive den mer nøyaktig.');
+    }
     const docRef = item ? S.db.doc('items/' + item.id) : S.db.collection('items').doc();
     const ok = await write(docRef.path, () => item ? docRef.update(data) : docRef.set({...data, attachments:[], order: 500, createdAt: Date.now()}));
     if (ok){ sheet.close(); toast(item ? 'Lagret' : 'Lagt til i planen'); }
@@ -830,6 +858,7 @@ function itemSheet(item, day){
     field(kind === 'stay' || kind === 'parking' ? 'Til og med' : 'Sluttdato (valgfritt)', 'f-end', endDate),
     field('Detaljer', 'f-details', details),
     field('Bookingnummer', 'f-ref', ref),
+    field('Adresse', 'f-place', place),
     h('div', {class:'row3'}, field('Pris totalt', 'f-cost', cost), field('Valuta', 'f-cur', currency)),
     h('div', {class:'row2'}, field('Booking', 'f-booked', booked), field('Betaling', 'f-pay', pay)),
     paidByField,
