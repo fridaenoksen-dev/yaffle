@@ -1,0 +1,3 @@
+supabase/seed-*.sql
+.vercel
+.DS_Store
