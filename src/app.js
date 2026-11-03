@@ -208,7 +208,7 @@ function render(){
   const hs = document.getElementById('plan-scroll'); const hx = hs ? hs.scrollLeft : null;
   const keep = {}; app.querySelectorAll('input[id]').forEach(el => { if (el.value) keep[el.id] = el.value; });
   const focusId = document.activeElement && app.contains(document.activeElement) ? document.activeElement.id : null;
-  app.replaceChildren(...view());
+  app.replaceChildren(...view().flat(9).filter(k => k != null && k !== false));
   for (const [id, v] of Object.entries(keep)){ const el = document.getElementById(id); if (el && !el.value) el.value = v; }
   if (focusId){ const el = document.getElementById(focusId); if (el) el.focus({preventScroll:true}); }
   app.classList.toggle('wide', S.view === 'ideer' || S.view === 'plan');
@@ -669,7 +669,7 @@ sheet.addEventListener('close', () => { detailId = null; });
 
 
 /* ---------- kart (Leaflet + OpenStreetMap) ---------- */
-let L_ready = null, mapEl = null, map = null, markerLayer = null, mapFitted = false;
+let L_ready = null, mapEl = null, map = null, markerLayer = null, mapFitted = false, placing = null;
 function loadLeaflet(){
   if (L_ready) return L_ready;
   L_ready = new Promise((res, rej) => {
@@ -691,6 +691,13 @@ function mapView(list){
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
       markerLayer = L.layerGroup().addTo(map);
       map.setView([54.349, 18.653], 14);
+      map.on('click', async e => {
+        if (!placing) return;
+        const id = placing; placing = null; mapEl.classList.remove('placing');
+        const ok = await write('items/' + id, () => S.db.doc('items/' + id).update({lat: e.latlng.lat, lng: e.latlng.lng}));
+        if (ok) toast('Overnattingen er satt på kartet');
+        render();
+      });
     }
     markerLayer.clearLayers();
     const pts = [];
@@ -716,8 +723,11 @@ function mapView(list){
   return [mapEl,
     h('div', {class:'maptools'},
       homeStay ? h('button', {class:'pill neutral', onclick:() => { if (map) map.setView([Number(homeStay.lat), Number(homeStay.lng)], 16); }}, h('span', {class:'mk mk-home', style:'width:20px;height:20px;box-shadow:none', svg:ICONS.stay}), 'Vis hvor dere bor')
-        : h('span', {class:'muted', style:'font-size:14px'}, 'Legg inn adressen på overnattingen i planen, så vises den på kartet.'),
-      h('button', {class:'pill neutral', onclick:() => { mapFitted = false; render(); }}, 'Vis alle')),
+        : (() => { const st = S.items.find(i => i.kind === 'stay'); return st && S.canWrite
+            ? h('button', {class:'pill ' + (placing ? 'ok' : 'neutral'), onclick:() => { placing = placing ? null : st.id; mapEl.classList.toggle('placing', !!placing); render(); if (placing) toast('Trykk på kartet der dere bor'); }}, placing ? 'Trykk på kartet der dere bor …' : 'Plasser overnattingen på kartet')
+            : h('span', {class:'muted', style:'font-size:14px'}, 'Legg inn adressen på overnattingen i planen, så vises den på kartet.'); })(),
+      h('button', {class:'pill neutral', onclick:() => { mapFitted = false; render(); }}, 'Vis alle'),
+      homeStay && S.canWrite ? h('button', {class:'pill neutral', onclick:() => { placing = homeStay.id; mapEl.classList.add('placing'); render(); toast('Trykk på kartet der dere bor'); }}, placing ? 'Trykk på kartet …' : 'Flytt hjem-nålen') : null),
     missing.length ? h('div', {class:'notice'}, h('span', null, 'Uten sted: ' + missing.map(i => i.title).join(', ') + '.'), h('span', {class:'muted'}, 'Legg inn adresse på idéen for å få den på kartet.')) : null];
 }
 
@@ -745,8 +755,12 @@ async function geocode(q){
   const query = t && !q.toLowerCase().includes(t.toLowerCase()) ? q + ', ' + t : q;
   try {
     const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=nb&q=' + encodeURIComponent(query));
-    const j = await r.json();
-    if (j && j[0]) return {lat: Number(j[0].lat), lng: Number(j[0].lon)};
+    if (r.ok){ const j = await r.json(); if (j && j[0]) return {lat: Number(j[0].lat), lng: Number(j[0].lon)}; }
+  } catch(e){}
+  try {
+    // Photon (OpenStreetMap-data fra Komoot) som reserve
+    const r = await fetch('https://photon.komoot.io/api/?limit=1&q=' + encodeURIComponent(query));
+    if (r.ok){ const j = await r.json(); const c = j && j.features && j.features[0] && j.features[0].geometry.coordinates; if (c) return {lat: c[1], lng: c[0]}; }
   } catch(e){}
   return null;
 }
