@@ -467,6 +467,42 @@ function dropZone(day, label){
   return el;
 }
 
+
+/* ---------- bilder: opplastet > bildelenke > Wikipedia ---------- */
+const wikiCache = new Map();
+try { const saved = JSON.parse(sessionStorage.getItem('yaffle-wiki') || '{}'); for (const [k, v] of Object.entries(saved)) wikiCache.set(k, v); } catch(e){}
+function parseWiki(v){
+  if (!v) return null;
+  const m = String(v).match(/^https?:\/\/([a-z-]+)\.(?:m\.)?wikipedia\.org\/wiki\/([^?#]+)/i);
+  if (m) return m[1] + ':' + decodeURIComponent(m[2]).replace(/_/g, ' ');
+  return /^[a-z-]{2,3}:.+/.test(v) ? v : null;
+}
+function wikiImage(key){
+  if (!key) return null;
+  if (wikiCache.has(key)) return wikiCache.get(key);
+  wikiCache.set(key, null);
+  const i = key.indexOf(':'); const lang = key.slice(0, i); const title = key.slice(i + 1).replace(/ /g, '_');
+  fetch('https://' + lang + '.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title))
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      const t = j && (j.thumbnail || j.originalimage);
+      if (!t || !t.source) return;
+      const src = j.thumbnail ? j.thumbnail.source.replace(/\/\d+px-/, '/800px-') : j.originalimage.source;
+      const page = (j.content_urls && j.content_urls.desktop && j.content_urls.desktop.page) || ('https://' + lang + '.wikipedia.org/wiki/' + title);
+      wikiCache.set(key, {src, page});
+      try { sessionStorage.setItem('yaffle-wiki', JSON.stringify(Object.fromEntries([...wikiCache].filter(([, v]) => v)))); } catch(e){}
+      render(); if (detailId && sheet.open) ideaDetail(detailId);
+    }).catch(() => {});
+  return null;
+}
+function ideaImage(i){
+  if (i.photo){ const src = blobUrl(i.photo); return src ? {src} : null; }
+  const u = safeUrl(i.photoUrl);
+  if (u && !parseWiki(u)) return {src:u, credit:new URL(u).hostname.replace(/^www\./,''), page:u};
+  const w = wikiImage(parseWiki(i.wiki) || parseWiki(i.photoUrl));
+  return w ? {src:w.src, credit:'Wikipedia', page:w.page} : null;
+}
+
 function hashNum(id){ let x = 7; for (const c of String(id)) x = (x*33 + c.charCodeAt(0)) >>> 0; return x; }
 
 function ideaCard(i){
@@ -475,8 +511,9 @@ function ideaCard(i){
   const [cname, c] = catOf(i.category);
   const who = heartsOf(i); const mine = S.me && who.includes(S.me);
   const heights = [190, 240, 160, 280, 210];
-  const media = i.photo
-    ? h('img', {src:blobUrl(i.photo), alt:'', loading:'lazy'})
+  const img = ideaImage(i);
+  const media = img
+    ? h('img', {src:img.src, alt:'', loading:'lazy', referrerpolicy:'no-referrer', onerror: e => { e.target.style.display = 'none'; }})
     : h('div', {class:'art', style:catStyle(c) + 'background:var(--c-bg);min-height:' + heights[hashNum(i.id) % heights.length] + 'px'},
         h('span', {svg: ICONS[c.icon] || ICONS.other, style:'display:inline-flex;justify-content:flex-end;width:100%'}),
         h('b', null, i.title || 'Idé'));
@@ -508,8 +545,9 @@ function ideaDetail(id){
   const time = h('input', {class:'input', type:'time', id:'d-time', value:i.time || '', style:'max-width:160px', disabled: !S.canWrite,
     onchange: e => write('ideas/' + i.id, () => S.db.doc('ideas/' + i.id).update({time: e.target.value || ''}))});
   openSheet(
-    h('div', {class:'detail-hero', style:catStyle(c)}, i.photo ? h('img', {src:blobUrl(i.photo), alt:''})
-      : h('div', {class:'art', style:'background:var(--c-bg)'}, h('span', {svg: ICONS[c.icon] || ICONS.other, style:'display:inline-flex'}))),
+    (() => { const img = ideaImage(i); return h('div', {class:'detail-hero', style:catStyle(c) + 'position:relative'}, img ? [h('img', {src:img.src, alt:'', referrerpolicy:'no-referrer'}),
+        img.credit ? h('a', {href:img.page, target:'_blank', rel:'noopener', style:'position:absolute;right:10px;bottom:10px;font-size:11px;font-weight:600;background:rgba(0,0,0,.55);color:#fff;padding:3px 8px;border-radius:99px;text-decoration:none'}, 'Foto: ' + img.credit) : null]
+      : h('div', {class:'art', style:'background:var(--c-bg)'}, h('span', {svg: ICONS[c.icon] || ICONS.other, style:'display:inline-flex'}))); })(),
     h('div', {style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px'},
       h('span', {class:'cat-chip', style:catStyle(c)}, cname), isAllIn(i) ? h('span', {class:'allin-badge'}, 'Alle er med!') : null),
     h('h2', null, i.title || 'Idé'),
@@ -576,7 +614,7 @@ async function attach(item, files){
 /* ---------- sheets ---------- */
 sheet.addEventListener('click', e => { if (e.target === sheet) sheet.close(); });
 function openSheet(...kids){
-  sheetBody.replaceChildren(h('div', {class:'grab', 'aria-hidden':'true'}), h('button', {class:'close', 'aria-label':'Lukk', onclick:() => sheet.close()}, '×'), ...kids);
+  sheetBody.replaceChildren(h('div', {class:'grab', 'aria-hidden':'true'}), h('button', {class:'close', 'aria-label':'Lukk', onclick:() => sheet.close()}, '×'), ...kids.flat(9).filter(k => k != null && k !== false));
   if (!sheet.open) sheet.showModal();
   const first = sheetBody.querySelector('input,textarea,select'); if (first) setTimeout(() => first.focus(), 30);
 }
@@ -651,6 +689,7 @@ function ideaSheet(idea){
   const catRow = h('div', {class:'kinds', role:'group', 'aria-label':'Kategori'}, Object.entries(CATS).map(([k, c]) => h('button', {type:'button', 'aria-pressed': String(k === catVal), style: k === catVal ? '' : catStyle(c) + 'background:var(--c-bg);color:var(--c-ink)',
     onclick: e => { catVal = k; catRow.querySelectorAll('button').forEach(b => { const on = b === e.currentTarget; b.setAttribute('aria-pressed', String(on)); const cc = CATS[b.textContent]; b.style.cssText = on ? '' : catStyle(cc) + 'background:var(--c-bg);color:var(--c-ink)'; }); }}, k)));
   let photo = i.photo || null;
+  const photoUrl = h('input', {class:'input', value: i.photoUrl || (i.wiki ? 'https://' + i.wiki.split(':')[0] + '.wikipedia.org/wiki/' + i.wiki.slice(i.wiki.indexOf(':') + 1).replace(/ /g, '_') : ''), placeholder:'Lim inn bildeadresse eller Wikipedia-side', inputmode:'url', maxlength:'600'});
   const prev = h('span');
   const showPrev = () => prev.replaceChildren(photo ? h('img', {src:blobUrl(photo), alt:''}) : '');
   showPrev();
@@ -667,12 +706,14 @@ function ideaSheet(idea){
   const form = h('form', {class:'form', onsubmit: async e => {
     e.preventDefault();
     if (!title.value.trim()){ title.focus(); return; }
-    const data = {title:title.value.trim(), note:note.value.trim(), link:link.value.trim(), category:catVal, photo: photo || null, day: day.value || null, time: time.value || ''};
+    const data = {title:title.value.trim(), note:note.value.trim(), link:link.value.trim(), category:catVal, photo: photo || null, photoUrl: photoUrl.value.trim(), wiki: parseWiki(photoUrl.value.trim()) || '', day: day.value || null, time: time.value || ''};
     if (idea){ const ok = await write('ideas/' + idea.id, () => S.db.doc('ideas/' + idea.id).update(data)); if (ok){ toast('Lagret'); ideaDetail(idea.id); } }
     else { sheet.close(); await addIdea(data); }
   }},
     field('Idé', 'i-title', title), field('Notat', 'i-note', note), field('Lenke', 'i-link', link), h('div', {class:'field'}, h('label', null, 'Hva slags'), catRow),
     h('div', {class:'field'}, h('label', null, 'Bilde'), h('div', {class:'photo-pick'}, prev, S.assets ? photoLbl : h('span', {class:'muted', style:'font-size:14px'}, 'Bare redaktører kan laste opp bilder.'))),
+    field('Eller bilde fra nett', 'i-photourl', photoUrl),
+    h('p', {class:'muted', style:'margin:-6px 0 0;font-size:13px'}, 'Opplastet bilde vises først. En Wikipedia-lenke henter bildet fra artikkelen.'),
     h('div', {class:'row2'}, field('Dag', 'i-day', day), field('Klokkeslett', 'i-time', time)),
     h('div', {class:'actions'},
       idea ? deleteBtn('Slett idéen', () => write('ideas/' + idea.id, () => S.db.doc('ideas/' + idea.id).delete())) : h('span'),
