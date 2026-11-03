@@ -710,10 +710,15 @@ async function attach(item, files){
 
 /* ---------- sheets ---------- */
 sheet.addEventListener('click', e => { if (e.target === sheet) sheet.close(); });
+document.getElementById('sheetClose').addEventListener('click', () => sheet.close());
 function openSheet(...kids){
-  sheetBody.replaceChildren(h('div', {class:'grab', 'aria-hidden':'true'}), h('button', {class:'close', 'aria-label':'Lukk', onclick:() => sheet.close()}, '×'), ...kids.flat(9).filter(k => k != null && k !== false));
+  sheetBody.replaceChildren(...kids.flat(9).filter(k => k != null && k !== false));
+  sheetBody.scrollTop = 0;
   if (!sheet.open) sheet.showModal();
-  const first = sheetBody.querySelector('input,textarea,select'); if (first) setTimeout(() => first.focus(), 30);
+  // Ikke hopp rett inn i et felt på mobil: tastaturet dytter da arket opp.
+  const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  const first = sheetBody.querySelector('input:not([type=time]):not([type=date]),textarea');
+  if (first && !touch) setTimeout(() => first.focus({preventScroll:true}), 30);
 }
 function field(label, id, el){ el.id = id; return h('div', {class:'field'}, h('label', {for:id}, label), el); }
 function deleteBtn(label, fn){
@@ -815,8 +820,8 @@ function ideaSheet(idea){
     field('Idé', 'i-title', title), field('Notat', 'i-note', note), field('Lenke', 'i-link', link), h('div', {class:'field'}, h('label', null, 'Hva slags'), catRow),
     h('div', {class:'field'}, h('label', null, 'Bilde'), h('div', {class:'photo-pick'}, prev, S.assets ? photoLbl : h('span', {class:'muted', style:'font-size:14px'}, 'Bare redaktører kan laste opp bilder.'))),
     field('Eller bilde fra nett', 'i-photourl', photoUrl),
-    field('Sted', 'i-place', place),
     h('p', {class:'muted', style:'margin:-6px 0 0;font-size:13px'}, 'Opplastet bilde vises først. En Wikipedia-lenke henter bildet fra artikkelen.'),
+    field('Sted', 'i-place', place),
     h('div', {class:'row2'}, field('Dag', 'i-day', day), field('Klokkeslett', 'i-time', time)),
     h('div', {class:'actions'},
       idea ? deleteBtn('Slett idéen', () => write('ideas/' + idea.id, () => S.db.doc('ideas/' + idea.id).delete())) : h('span'),

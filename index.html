@@ -255,13 +255,16 @@ textarea.input{min-height:84px;resize:vertical}
 .btn[disabled]{opacity:.5;cursor:default}
 
 /* sheets */
-dialog.sheet{border:0;padding:0;background:var(--paper);color:var(--text);width:100%;max-width:560px;max-height:92vh;border-radius:28px 28px 0 0;margin:auto auto 0;box-shadow:0 -10px 40px rgba(0,0,0,.2)}
+dialog.sheet{border:0;padding:0;background:var(--paper);color:var(--text);width:100%;max-width:560px;max-height:92vh;max-height:92dvh;overflow:hidden;border-radius:28px 28px 0 0;margin:auto auto 0;box-shadow:0 -10px 40px rgba(0,0,0,.2)}
 dialog.sheet::backdrop{background:rgba(14,15,12,.45)}
 @media (min-width:700px){dialog.sheet{border-radius:28px;margin:auto}}
-.sheet-in{padding:22px 22px 28px;overflow:auto;max-height:92vh}
+dialog.sheet[open]{display:flex;flex-direction:column}
+.sheet-head{flex:none;display:flex;align-items:center;justify-content:center;position:relative;padding:12px 22px 6px;background:var(--paper)}
+.sheet-head .grab{margin:0}
+.sheet-in{padding:6px 22px calc(28px + env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;max-height:none}
 .grab{width:40px;height:5px;border-radius:3px;background:var(--fog-2);margin:0 auto 14px}
 .sheet h2{font-family:var(--display);font-weight:900;font-size:32px;letter-spacing:-.04em;line-height:1;color:var(--ink);margin:0 0 18px}
-.close{position:absolute;top:18px;right:18px;width:36px;height:36px;border-radius:50%;border:0;background:var(--fog);font-size:20px;line-height:1;color:var(--ink)}
+.close{position:absolute;top:8px;right:14px;width:36px;height:36px;border-radius:50%;border:0;background:var(--fog);font-size:20px;line-height:1;color:var(--ink)}
 .form{display:grid;gap:14px}
 .field{display:grid;gap:6px}
 .field label{font-size:13px;font-weight:600;color:var(--muted)}
@@ -344,7 +347,7 @@ dialog.sheet::backdrop{background:rgba(14,15,12,.45)}
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
-<dialog class="sheet" id="sheet"><div class="sheet-in" id="sheetBody"></div></dialog>
+<dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
 <script type="module" src="./src/runtime.js"></script>
 </body>
