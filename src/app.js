@@ -80,7 +80,7 @@ const S = {
   trip:null, items:[], ideas:[], members:{}, profiles:{},
   loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
   view: ['plan','ideer','penger','papirer'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'plan',
-  filter:'all', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
+  filter:'all', boardMode:'tavle', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
 
@@ -291,102 +291,60 @@ function summary(){
 }
 
 /* ---------- penger ---------- */
-function moneyData(){
-  const n = groupSize(); const ids = memberIds();
-  const byCur = {};
-  for (const i of S.items){
-    const c = Number(i.cost); if (!(c > 0)) continue;
-    const cur = i.currency || 'NOK';
-    const m = byCur[cur] || (byCur[cur] = {total:0, paid:0, unpaid:0, unknown:0, paidBy:{}, noPayer:0});
-    m.total += c;
-    if (i.pay === 'paid'){ m.paid += c; if (i.paidBy) m.paidBy[i.paidBy] = (m.paidBy[i.paidBy] || 0) + c; else m.noPayer += c; }
-    else if (i.pay === 'unpaid') m.unpaid += c; else m.unknown += c;
-  }
-  // Hvem skylder hvem: alt deles likt på alle som er med
-  for (const m of Object.values(byCur)){
-    const share = m.total / n; m.share = share; m.transfers = [];
-    if (m.noPayer > 0 || ids.length < n) continue;
-    const bal = ids.map(id => ({id, v: (m.paidBy[id] || 0) - share}));
-    const debt = bal.filter(x => x.v < -0.5).sort((a, b) => a.v - b.v);
-    const cred = bal.filter(x => x.v > 0.5).sort((a, b) => b.v - a.v);
-    let i = 0, j = 0;
-    while (i < debt.length && j < cred.length){
-      const amt = Math.min(-debt[i].v, cred[j].v);
-      m.transfers.push({from: debt[i].id, to: cred[j].id, amt});
-      debt[i].v += amt; cred[j].v -= amt;
-      if (debt[i].v > -0.5) i++; if (cred[j].v < 0.5) j++;
-    }
-  }
-  return byCur;
+// Kurser til NOK hentes fra Frankfurter (ECB-kurser). Reserven brukes hvis den ikke svarer.
+const FALLBACK_RATES = {NOK:1, PLN:2.5, EUR:11.7};
+const FX = {rates:{...FALLBACK_RATES}, date:null, live:false, loading:false};
+function loadRates(){
+  if (FX.loading || FX.live) return; FX.loading = true;
+  fetch('https://api.frankfurter.app/latest?from=NOK&to=PLN,EUR')
+    .then(r => r.ok ? r.json() : null)
+    .then(j => { if (!j || !j.rates) return; for (const [k, v] of Object.entries(j.rates)) if (v > 0) FX.rates[k] = 1 / v; FX.date = j.date; FX.live = true; render(); })
+    .catch(() => {}).finally(() => { FX.loading = false; });
 }
+const toNok = (amount, cur) => amount * (FX.rates[cur || 'NOK'] || 1);
 
 function moneyView(){
-  const data = moneyData(); const curs = Object.keys(data);
-  const costItems = S.items.filter(i => Number(i.cost) > 0).sort((a, b) => sortKey({...a, time:(a.date||'') + (a.time||'')}) < sortKey({...b, time:(b.date||'') + (b.time||'')}) ? -1 : 1);
-  const todo = S.items.filter(i => i.booked === 'no' || i.pay === 'unpaid' || i.pay === 'unknown');
-  const noPayer = S.items.filter(i => i.pay === 'paid' && Number(i.cost) > 0 && !i.paidBy);
-  const out = [];
+  loadRates();
+  const costs = S.items.filter(i => Number(i.cost) > 0)
+    .map(i => ({i, nok: toNok(Number(i.cost), i.currency)}))
+    .sort((a, b) => b.nok - a.nok);
+  if (!costs.length) return [h('div', {class:'empty'}, h('h3', null, 'Ingen priser ennå'), h('p', null, 'Legg inn pris på bookingene i planen, så ser du her hva turen koster.'))];
 
-  if (!curs.length) return [h('div', {class:'empty'}, h('h3', null, 'Ingen priser ennå'), h('p', null, 'Legg inn pris på bookingene i planen, så regner Yaffle ut totalen, hva det blir per person og hvem som skylder hvem.'))];
+  const total = costs.reduce((a, c) => a + c.nok, 0);
+  const n = groupSize();
+  const byKind = {};
+  for (const c of costs){ const k = c.i.kind || 'other'; byKind[k] = (byKind[k] || 0) + c.nok; }
+  const kinds = Object.entries(byKind).sort((a, b) => b[1] - a[1]);
+  const foreign = [...new Set(costs.map(c => c.i.currency).filter(c => c && c !== 'NOK'))];
+  const rateLine = foreign.map(c => '1 ' + (CUR[c] || c) + ' = ' + FX.rates[c].toFixed(2).replace('.', ',') + ' kr').join(' · ');
 
-  out.push(h('div', {class:'moneygrid'}, curs.map(cur => {
-    const m = data[cur];
-    return h('section', {class:'moneycard'},
-      h('div', {class:'kicker'}, 'Totalt i ' + cur),
-      h('div', {class:'moneybig'}, money(Math.round(m.total), cur)),
-      h('div', {class:'moneysub'}, 'ca. ', h('b', null, money(Math.round(m.share), cur)), ' per person'),
-      h('div', {class:'bar', role:'img', 'aria-label': Math.round(m.paid / m.total * 100) + ' % betalt'}, h('span', {style:'width:' + (m.paid / m.total * 100) + '%'})),
-      h('div', {class:'moneyrow'}, h('span', null, 'Betalt'), h('b', null, money(Math.round(m.paid), cur))),
-      m.unpaid ? h('div', {class:'moneyrow'}, h('span', null, 'Ikke betalt'), h('b', {style:'color:var(--red)'}, money(Math.round(m.unpaid), cur))) : null,
-      m.unknown ? h('div', {class:'moneyrow'}, h('span', null, 'Betalt?'), h('b', {style:'color:var(--amber)'}, money(Math.round(m.unknown), cur))) : null
-    );
-  })));
-
-  // Gjøre opp
-  const settle = h('section', {class:'moneysection'}, h('h3', null, 'Gjøre opp'));
-  if (noPayer.length || memberIds().length < groupSize()){
-    settle.append(h('p', {class:'muted', style:'margin:0 0 12px'}, noPayer.length
-      ? 'Velg hvem som betalte, så regner Yaffle ut hvem som skylder hvem. Alt deles likt på ' + groupSize() + '.'
-      : 'Venter på at alle ' + groupSize() + ' har logget inn, så regner Yaffle ut hvem som skylder hvem.'));
-    if (noPayer.length && memberIds().length) settle.append(h('div', {class:'stack'}, noPayer.map(i => h('div', {class:'payrow'},
-      h('div', null, h('b', null, i.title), h('span', {class:'muted'}, ' · ' + money(Number(i.cost), i.currency))),
-      S.canWrite ? h('select', {class:'dayselect', 'aria-label':'Hvem betalte ' + i.title, onchange: e => e.target.value && write('items/' + i.id, () => S.db.doc('items/' + i.id).update({paidBy: e.target.value}))},
-        h('option', {value:''}, 'Hvem betalte?'), memberIds().map(id => h('option', {value:id}, nameOf(id)))) : null))));
-  } else {
-    const all = curs.flatMap(cur => data[cur].transfers.map(t => ({...t, cur})));
-    settle.append(all.length ? h('div', {class:'stack'}, all.map(t => h('div', {class:'payrow'},
-      h('div', {style:'display:flex;align-items:center;gap:8px;flex-wrap:wrap'}, face(t.from, true), h('b', null, nameOf(t.from)), h('span', {class:'muted'}, 'betaler'), face(t.to, true), h('b', null, nameOf(t.to))),
-      h('b', {style:'font-variant-numeric:tabular-nums'}, money(Math.round(t.amt), t.cur)))))
-      : h('p', {class:'muted', style:'margin:0'}, 'Dere er skuls! Alle har betalt like mye.'));
-  }
-  out.push(settle);
-
-  // Hver person
-  if (memberIds().length) out.push(h('section', {class:'moneysection'}, h('h3', null, 'Hva hver har lagt ut'),
-    h('div', {class:'stack'}, memberIds().map(id => h('div', {class:'payrow'},
-      h('div', {style:'display:flex;align-items:center;gap:8px'}, face(id, true), h('b', null, nameOf(id))),
-      h('span', {style:'font-variant-numeric:tabular-nums'}, curs.map((cur, k) => [k ? ' · ' : '', money(Math.round(data[cur].paidBy[id] || 0), cur)])))))));
-
-  // Gjenstår
-  out.push(h('section', {class:'moneysection'}, h('h3', null, 'Gjenstår'),
-    todo.length ? h('div', {class:'stack'}, todo.map(i => h('div', {class:'payrow'},
-      h('div', null, h('b', null, i.title), h('span', {class:'muted'}, isoDate(i.date) ? ' · ' + dayLabel(i.date, true) : '')),
-      h('div', {style:'display:flex;gap:6px;flex-wrap:wrap'}, i.booked === 'no' ? bookedPill(i) : null, i.pay === 'unpaid' || i.pay === 'unknown' ? payPill(i) : null))))
-    : h('p', {class:'muted', style:'margin:0'}, 'Alt er booket og betalt. 🎉')));
-
-  // Alle kostnader
-  out.push(h('section', {class:'moneysection'}, h('h3', null, 'Alle kostnader'),
-    h('div', {class:'stack'}, costItems.map(i => h('div', {class:'payrow'},
-      h('div', null, h('b', null, i.title), h('span', {class:'muted'}, (isoDate(i.date) ? ' · ' + dayLabel(i.date, true) : '') + (i.pay === 'paid' && i.paidBy ? ' · betalt av ' + nameOf(i.paidBy) : ''))),
-      h('div', {style:'text-align:right;font-variant-numeric:tabular-nums'}, h('b', null, money(Number(i.cost), i.currency)), h('div', {class:'muted', style:'font-size:13px'}, money(Math.round(Number(i.cost) / groupSize()), i.currency) + ' hver')))))));
-  return out;
+  return [
+    h('section', {class:'moneycard', style:'margin-bottom:24px'},
+      h('div', {class:'kicker'}, 'Hele turen'),
+      h('div', {class:'moneybig'}, money(Math.round(total), 'NOK')),
+      h('div', {class:'moneysub'}, 'ca. ', h('b', null, money(Math.round(total / n), 'NOK')), ' per person når dere er ' + n),
+      foreign.length ? h('div', {class:'muted', style:'font-size:13px'}, rateLine + (FX.live ? ' (kurs ' + FX.date.split('-').reverse().join('.') + ')' : ' (omtrentlig kurs)')) : null
+    ),
+    h('section', {class:'moneysection'}, h('h3', null, 'Fordelt på'),
+      h('div', {class:'stack'}, kinds.map(([k, v]) => h('div', {class:'kindrow'},
+        h('div', {class:'tile ' + k, svg: ICONS[k] || ICONS.other, 'aria-hidden':'true', style:'width:36px;height:36px;border-radius:11px'}),
+        h('div', {style:'flex:1;min-width:0'},
+          h('div', {style:'display:flex;justify-content:space-between;gap:8px'}, h('b', null, KIND_LABEL[k] || 'Annet'), h('b', {style:'font-variant-numeric:tabular-nums'}, money(Math.round(v), 'NOK'))),
+          h('div', {class:'bar', style:'margin:6px 0 0'}, h('span', {style:'width:' + (v / total * 100) + '%'}))))))),
+    h('section', {class:'moneysection'}, h('h3', null, 'Alle kostnader'),
+      h('div', {class:'stack'}, costs.map(({i, nok}) => h('div', {class:'payrow'},
+        h('div', null, h('b', null, i.title), h('span', {class:'muted'}, isoDate(i.date) ? ' · ' + dayLabel(i.date, true) : '')),
+        h('div', {style:'text-align:right;font-variant-numeric:tabular-nums'},
+          h('b', null, money(Math.round(nok), 'NOK')),
+          h('div', {class:'muted', style:'font-size:13px'}, (i.currency && i.currency !== 'NOK' ? money(Number(i.cost), i.currency) + ' · ' : '') + money(Math.round(nok / n), 'NOK') + ' hver'))))))
+  ];
 }
 
 function tabs(){
   const nIdeas = S.ideas.filter(i => !isoDate(i.day) || !tripDays().includes(i.day)).length;
   const nFiles = S.items.reduce((a, i) => a + (i.attachments || []).length, 0);
   const t = (id, label, n) => h('button', {class:'tab', role:'tab', 'aria-selected': String(S.view === id), onclick:() => go(id)}, label, n ? h('sup', null, n) : null);
-  const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Trykk på et kort for detaljer, gi hjerter, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.', penger:'Hva turen koster, hva som er betalt, og hvem som skylder hvem.'};
+  const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Gi hjerte til det du vil gjøre, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.', penger:'Hva turen koster, regnet om til kroner.'};
   return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('penger','Penger'), t('papirer','Papirer', nFiles)), h('p', {class:'tabhint'}, hints[S.view])];
 }
 
@@ -532,9 +490,12 @@ function boardView(){
 
   const grid = list.length ? h('div', {class:'masonry'}, list.map(ideaCard)) : h('div', {class:'empty'},
     h('h3', null, S.ideas.length ? 'Ingen idéer her' : 'Tavla er tom'),
-    h('p', null, S.ideas.length ? 'Prøv et annet filter.' : 'Fest det første forslaget: en kafé, et museum, en dagstur. Gi hjerter til det dere vil gjøre.'));
+    h('p', null, S.ideas.length ? 'Prøv et annet filter.' : 'Fest det første forslaget, for eksempel en kafé eller en dagstur.'));
 
-  return [quick, h('div', {class:'boardbar'}, h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('allin','Alle er med'))), drops, grid];
+  const mode = (id, label) => h('button', {'aria-pressed': String(S.boardMode === id), onclick:() => { S.boardMode = id; render(); }}, label);
+  const bar = h('div', {class:'boardbar'}, h('div', {class:'seg', role:'group', 'aria-label':'Visning'}, mode('tavle','Tavle'), mode('kart','Kart')), h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('allin','Alle er med')));
+  if (S.boardMode === 'kart') return [quick, bar, ...mapView(list)];
+  return [quick, bar, drops, grid];
 }
 
 function dropZone(day, label){
@@ -631,6 +592,7 @@ function ideaDetail(id){
     h('h2', null, i.title || 'Idé'),
     i.note ? h('p', {class:'details', style:'font-size:16px;margin:0 0 10px'}, i.note) : h('p', {class:'muted', style:'margin:0 0 10px'}, 'Ingen beskrivelse ennå.'),
     url ? h('p', {style:'margin:0 0 6px'}, h('a', {href:url, target:'_blank', rel:'noopener', style:'color:var(--ink);font-weight:600'}, 'Åpne ' + new URL(url).hostname.replace(/^www\./,'') + ' ↗')) : null,
+    hasPos(i) ? h('p', {style:'margin:0 0 6px'}, h('a', {href:'https://www.google.com/maps/search/?api=1&query=' + i.lat + ',' + i.lng, target:'_blank', rel:'noopener', style:'color:var(--ink);font-weight:600'}, 'Veibeskrivelse' + (i.place ? ' til ' + i.place : '') + ' ↗')) : null,
     h('div', {class:'section-label'}, 'Hvem vil?'),
     heartBtn(i),
     h('div', {class:'section-label'}, planned ? 'Planlagt ' + dayLabel(i.day).toLowerCase() : 'Flytt inn på en dag'),
@@ -645,6 +607,63 @@ function ideaDetail(id){
   );
 }
 sheet.addEventListener('close', () => { detailId = null; });
+
+
+/* ---------- kart (Leaflet + OpenStreetMap) ---------- */
+let L_ready = null, mapEl = null, map = null, markerLayer = null, mapFitted = false;
+function loadLeaflet(){
+  if (L_ready) return L_ready;
+  L_ready = new Promise((res, rej) => {
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.append(css);
+    const js = document.createElement('script'); js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'; js.onload = () => res(window.L); js.onerror = rej; document.head.append(js);
+  });
+  return L_ready;
+}
+const hasPos = x => Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && x.lat !== null && x.lng !== null && x.lat !== '' ;
+function mapView(list){
+  if (!mapEl){ mapEl = h('div', {class:'mapbox', role:'region', 'aria-label':'Kart over idéene'}); }
+  const placed = list.filter(hasPos);
+  const missing = list.filter(i => !hasPos(i));
+  const stays = S.items.filter(i => i.kind === 'stay' && hasPos(i));
+  loadLeaflet().then(L => {
+    if (!map){
+      map = L.map(mapEl, {scrollWheelZoom:false, zoomControl:true});
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+      markerLayer = L.layerGroup().addTo(map);
+      map.setView([54.349, 18.653], 14);
+    }
+    markerLayer.clearLayers();
+    const pts = [];
+    for (const s of stays){
+      const m = L.marker([Number(s.lat), Number(s.lng)], {icon: L.divIcon({className:'', html:'<span class="mk mk-home">' + ICONS.stay + '</span>', iconSize:[34, 34], iconAnchor:[17, 17]}), title:s.title, keyboard:true});
+      m.bindTooltip(s.title); markerLayer.addLayer(m); pts.push([Number(s.lat), Number(s.lng)]);
+    }
+    for (const i of placed){
+      const [cname, c] = catOf(i.category);
+      const html = '<span class="mk' + (isAllIn(i) ? ' mk-allin' : '') + '" style="' + catStyle(c) + '">' + (ICONS[c.icon] || ICONS.other) + '</span>';
+      const m = L.marker([Number(i.lat), Number(i.lng)], {icon: L.divIcon({className:'', html, iconSize:[34, 34], iconAnchor:[17, 17]}), title:i.title + ' (' + cname + ')', keyboard:true, riseOnHover:true});
+      m.bindTooltip(i.title, {direction:'top', offset:[0, -16]});
+      m.on('click', () => ideaDetail(i.id)); markerLayer.addLayer(m); pts.push([Number(i.lat), Number(i.lng)]);
+    }
+    // Zoom til sentrum: ta med punkter innen ca. 5 km fra der dere bor (eller midten av punktene)
+    const home = pts.length ? (stays.length ? [Number(stays[0].lat), Number(stays[0].lng)] : pts[0]) : null;
+    const near = home ? pts.filter(p => Math.hypot((p[0] - home[0]) * 111, (p[1] - home[1]) * 65) < 5) : [];
+    setTimeout(() => { map.invalidateSize(); if (!mapFitted && pts.length){ map.fitBounds(near.length > 1 ? near : pts, {padding:[40, 40], maxZoom:16}); mapFitted = true; } }, 50);
+  }).catch(() => { mapEl.textContent = 'Kartet kunne ikke lastes. Sjekk nettet.'; });
+  return [mapEl,
+    missing.length ? h('div', {class:'notice'}, h('span', null, 'Uten sted: ' + missing.map(i => i.title).join(', ') + '.'), h('span', {class:'muted'}, 'Legg inn adresse på idéen for å få den på kartet.')) : null];
+}
+
+async function geocode(q){
+  const t = S.trip && S.trip.title;
+  const query = t && !q.toLowerCase().includes(t.toLowerCase()) ? q + ', ' + t : q;
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=nb&q=' + encodeURIComponent(query));
+    const j = await r.json();
+    if (j && j[0]) return {lat: Number(j[0].lat), lng: Number(j[0].lon)};
+  } catch(e){}
+  return null;
+}
 
 async function addIdea(data){
   const ref = S.db.collection('ideas').doc();
@@ -781,16 +800,22 @@ function ideaSheet(idea){
   const photoLbl = h('label', {class:'attach'}, photoInput, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), document.createTextNode(photo ? 'Bytt bilde' : 'Legg til bilde'));
   const day = h('select', {class:'input'}, h('option', {value:''}, 'Ikke planlagt (på tavla)'), days.map(d => h('option', {value:d, selected: i.day === d}, dayLabel(d))));
   const time = h('input', {class:'input', type:'time', value:i.time || ''});
+  const place = h('input', {class:'input', value:i.place || '', placeholder:'F.eks. Targ Węglowy eller en adresse', maxlength:'200'});
   const form = h('form', {class:'form', onsubmit: async e => {
     e.preventDefault();
     if (!title.value.trim()){ title.focus(); return; }
-    const data = {title:title.value.trim(), note:note.value.trim(), link:link.value.trim(), category:catVal, photo: photo || null, photoUrl: photoUrl.value.trim(), wiki: parseWiki(photoUrl.value.trim()) || '', day: day.value || null, time: time.value || ''};
+    const data = {title:title.value.trim(), note:note.value.trim(), link:link.value.trim(), category:catVal, photo: photo || null, photoUrl: photoUrl.value.trim(), wiki: parseWiki(photoUrl.value.trim()) || '', day: day.value || null, time: time.value || '', place: place.value.trim()};
+    if (data.place && (data.place !== (i.place || '') || !hasPos(i))){
+      const pos = await geocode(data.place);
+      if (pos){ data.lat = pos.lat; data.lng = pos.lng; } else toast('Fant ikke «' + data.place + '» på kartet. Prøv en mer nøyaktig adresse.');
+    } else if (!data.place){ data.lat = null; data.lng = null; }
     if (idea){ const ok = await write('ideas/' + idea.id, () => S.db.doc('ideas/' + idea.id).update(data)); if (ok){ toast('Lagret'); ideaDetail(idea.id); } }
     else { sheet.close(); await addIdea(data); }
   }},
     field('Idé', 'i-title', title), field('Notat', 'i-note', note), field('Lenke', 'i-link', link), h('div', {class:'field'}, h('label', null, 'Hva slags'), catRow),
     h('div', {class:'field'}, h('label', null, 'Bilde'), h('div', {class:'photo-pick'}, prev, S.assets ? photoLbl : h('span', {class:'muted', style:'font-size:14px'}, 'Bare redaktører kan laste opp bilder.'))),
     field('Eller bilde fra nett', 'i-photourl', photoUrl),
+    field('Sted', 'i-place', place),
     h('p', {class:'muted', style:'margin:-6px 0 0;font-size:13px'}, 'Opplastet bilde vises først. En Wikipedia-lenke henter bildet fra artikkelen.'),
     h('div', {class:'row2'}, field('Dag', 'i-day', day), field('Klokkeslett', 'i-time', time)),
     h('div', {class:'actions'},
