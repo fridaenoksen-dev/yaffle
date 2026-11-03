@@ -30,7 +30,7 @@ const brand = () =>
     ),
   );
 
-if (!SUPABASE_URL || SUPABASE_URL.includes("DITT-PROSJEKT")) {
+if (!SUPABASE_URL || /DITT-PROSJEKT|xxxxx/.test(SUPABASE_URL) || !SUPABASE_ANON_KEY || /…|LIM-INN/.test(SUPABASE_ANON_KEY)) {
   app.replaceChildren(
     brand(),
     h(
@@ -57,77 +57,58 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 /* ---------- login screens ---------- */
 function loginScreen(note) {
-  const email = h("input", {
-    class: "input",
-    id: "login-email",
-    type: "email",
-    autocomplete: "email",
-    placeholder: "navn@epost.no",
-    required: true,
-    "aria-label": "E-post",
-  });
-  const btn = h(
-    "button",
-    { class: "btn dark", type: "submit" },
-    "Send innloggingslenke",
-  );
-  const msg = h(
-    "p",
-    { role: "status" },
-    note || "Vi sender deg en lenke på e-post. Trykk på den, så er du inne.",
-  );
-  const form = h(
-    "form",
-    {
-      class: "onboard",
-      onsubmit: async (e) => {
-        e.preventDefault();
-        const v = email.value.trim();
-        if (!v) return email.focus();
-        btn.disabled = true;
-        btn.textContent = "Sender …";
-        const { error } = await sb.auth.signInWithOtp({
-          email: v,
-          options: { emailRedirectTo: location.origin + location.pathname },
-        });
-        if (error) {
-          btn.disabled = false;
-          btn.textContent = "Send innloggingslenke";
-          msg.textContent = /rate|limit/i.test(error.message)
-            ? "For mange forsøk. Vent litt og prøv igjen."
-            : "Fikk ikke sendt lenken. Sjekk e-postadressen og prøv igjen.";
-          return;
-        }
-        form.replaceChildren(
-          h("h2", null, "Sjekk e-posten din"),
-          h(
-            "p",
-            null,
-            "Vi har sendt en innloggingslenke til ",
-            h("b", { style: "color:var(--ink)" }, v),
-            ". Åpne den på denne enheten.",
-          ),
-          h(
-            "button",
-            {
-              class: "linkbtn",
-              type: "button",
-              style: "margin-top:16px;align-self:flex-start",
-              onclick: () => loginScreen(),
-            },
-            "Bruk en annen e-post",
-          ),
-        );
-      },
-    },
-    h("h2", null, "Logg inn"),
-    msg,
-    email,
-    btn,
-  );
+  const email = h("input", { class: "input", id: "login-email", type: "email", autocomplete: "username", placeholder: "navn@epost.no", required: true, "aria-label": "E-post" });
+  const pass = h("input", { class: "input", id: "login-pass", type: "password", autocomplete: "current-password", placeholder: "Passord", required: true, "aria-label": "Passord" });
+  const show = h("button", { type: "button", class: "linkbtn", style: "font-size:14px;color:var(--muted);align-self:flex-end", onclick: () => {
+    const on = pass.type === "password"; pass.type = on ? "text" : "password"; show.textContent = on ? "Skjul passord" : "Vis passord";
+  } }, "Vis passord");
+  const btn = h("button", { class: "btn dark", type: "submit" }, "Logg inn");
+  const msg = h("p", { role: "status" }, note || "Logg inn med e-posten og passordet du har fått.");
+  const form = h("form", { class: "onboard", style: "gap:12px", onsubmit: async (e) => {
+    e.preventDefault();
+    const v = email.value.trim(); if (!v) return email.focus(); if (!pass.value) return pass.focus();
+    btn.disabled = true; btn.textContent = "Logger inn …";
+    const { data, error } = await sb.auth.signInWithPassword({ email: v, password: pass.value });
+    if (error) {
+      btn.disabled = false; btn.textContent = "Logg inn";
+      msg.style.color = "var(--red)";
+      msg.textContent = /invalid login credentials/i.test(error.message) ? "Feil e-post eller passord. Prøv igjen."
+        : /not confirmed/i.test(error.message) ? "Brukeren er ikke bekreftet ennå. Be den som administrerer turen huke av for «Auto Confirm User»."
+        : /rate|limit|too many/i.test(error.message) ? "For mange forsøk. Vent et par minutter og prøv igjen."
+        : "Fikk ikke logget inn. Sjekk nettet og prøv igjen.";
+      pass.select();
+      return;
+    }
+    if (data && data.session) start(data.session);
+  } },
+    h("h2", { style: "margin-bottom:6px" }, "Logg inn"), msg, email, pass, show, btn,
+    h("p", { style: "font-size:14px;margin-top:8px" }, "Glemt passordet? Be den som administrerer turen om å sette et nytt."));
   app.replaceChildren(brand(), form);
   setTimeout(() => email.focus(), 50);
 }
+
+// Lar hver person bytte fra passordet de fikk til sitt eget.
+window.yaffleChangePassword = () => {
+  const dlg = h("dialog", { class: "sheet" });
+  const p1 = h("input", { class: "input", id: "new-pass", type: "password", autocomplete: "new-password", minlength: "8", placeholder: "Minst 8 tegn", "aria-label": "Nytt passord" });
+  const p2 = h("input", { class: "input", id: "new-pass2", type: "password", autocomplete: "new-password", placeholder: "Gjenta passordet", "aria-label": "Gjenta passordet" });
+  const msg = h("p", { role: "status", class: "muted", style: "margin:0" }, "Velg et passord bare du vet.");
+  const btn = h("button", { class: "btn primary", type: "submit" }, "Lagre passord");
+  const form = h("form", { class: "form", onsubmit: async (e) => {
+    e.preventDefault();
+    if (p1.value.length < 8) { msg.textContent = "Passordet må ha minst 8 tegn."; return p1.focus(); }
+    if (p1.value !== p2.value) { msg.textContent = "Passordene er ikke like."; return p2.focus(); }
+    btn.disabled = true;
+    const { error } = await sb.auth.updateUser({ password: p1.value });
+    btn.disabled = false;
+    if (error) { msg.textContent = /same|different/i.test(error.message) ? "Velg et annet passord enn det du har nå." : /weak|short|length/i.test(error.message) ? "Passordet er for svakt. Prøv et lengre." : "Fikk ikke lagret. Prøv igjen."; return; }
+    form.replaceChildren(h("h2", null, "Passordet er byttet"), h("p", null, "Bruk det nye passordet neste gang du logger inn."), h("button", { class: "btn dark", type: "button", onclick: () => dlg.close() }, "Ferdig"));
+  } }, h("h2", null, "Bytt passord"), msg, p1, p2, h("div", { class: "actions" }, h("button", { type: "button", class: "linkbtn", onclick: () => dlg.close() }, "Avbryt"), btn));
+  dlg.append(h("div", { class: "sheet-in" }, h("div", { class: "grab", "aria-hidden": "true" }), form));
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+  document.body.append(dlg); dlg.showModal(); setTimeout(() => p1.focus(), 30);
+};
 
 function noAccessScreen(emailAddr) {
   app.replaceChildren(

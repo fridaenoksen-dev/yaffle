@@ -15,16 +15,17 @@ supabase/seed-*.sql   Turdata (ligger IKKE i git, se .gitignore)
 vercel.json           Sikkerhetshoder, skjuler siden fra Google
 ```
 
-Bare e-poster som står i tabellen `allowed_emails` kommer inn. Andre kan be om en innloggingslenke,
-men ser bare «Ingen tilgang ennå» og får verken lese eller skrive noe.
+Innlogging er e-post + passord. Du lager brukerne selv i Supabase, så det sendes ingen e-post.
+I tillegg må e-posten stå i tabellen `allowed_emails`, ellers ser personen bare «Ingen tilgang ennå».
 
 ## 1. Supabase (ca. 10 min)
 
 1. Lag et gratis prosjekt på supabase.com. Velg region **Stockholm (eu-north-1)** eller Frankfurt.
 2. **SQL Editor → New query**: lim inn `supabase/schema.sql`. Bytt ut e-postene nederst med gjengens ekte adresser, og trykk **Run**.
 3. Kjør `supabase/seed-gdansk.sql` på samme måte for å legge inn Gdańsk-turen.
-4. **Authentication → Sign In / Providers → Email**: la «Email» være på. Skru gjerne av **Allow new users to sign up**
-   etter at alle har logget inn én gang. Det er uansett `allowed_emails` som bestemmer tilgangen.
+4. **Authentication → Sign In / Providers → Email**: la «Email» være på, og skru av **Allow new users to sign up**.
+5. **Authentication → Users → Add user → Create new user** for hver person: e-post, et midlertidig passord,
+   og huk av for **Auto Confirm User**. Hver kan bytte passord selv i appen («Bytt passord» øverst).
 5. **Project Settings → API**: kopier *Project URL* og *anon public key* inn i `src/config.js`.
 
 ## 2. Vercel
@@ -34,7 +35,7 @@ men ser bare «Ingen tilgang ennå» og får verken lese eller skrive noe.
 3. Kopier adressen du får (f.eks. `https://yaffle.vercel.app`).
 4. Tilbake i Supabase: **Authentication → URL Configuration**
    - Site URL: `https://yaffle.vercel.app`
-   - Redirect URLs: `https://yaffle.vercel.app/**` (og `http://localhost:3000/**` hvis du tester lokalt)
+   (Trengs bare hvis dere senere slår på e-postlenker eller Google-innlogging.)
 
 ## 3. Kvitteringene
 
@@ -43,6 +44,8 @@ Last dem opp igjen i appen med «Legg ved kvittering» på hver booking. De lagr
 
 ## Legge til en ny venninne
 
+1. Authentication → Users → Add user → Create new user (huk av for Auto Confirm User).
+2. SQL Editor:
 ```sql
 insert into public.allowed_emails (email) values ('ny@eksempel.no');
 ```
@@ -55,7 +58,6 @@ npx serve .
 
 ## Greit å vite
 
-- Supabase sin innebygde e-posttjeneste sender bare noen få innloggingslenker i timen. Det holder for tre personer.
-  Trenger dere mer, legg inn egen SMTP under Authentication → Emails.
+- Glemt passord: gå til Authentication → Users, velg personen → «Update password» (eller slett og lag på nytt).
 - Anon-nøkkelen i `src/config.js` er laget for å være offentlig. Sikkerheten ligger i reglene i `schema.sql`.
   Bruk aldri `service_role`-nøkkelen i frontend.

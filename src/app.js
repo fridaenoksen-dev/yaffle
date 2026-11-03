@@ -247,6 +247,7 @@ function topBar(){
     h('div', {class:'brand'}, h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
     h('div', {style:'display:flex;align-items:center;gap:12px'},
       ids.length ? h('div', {class:'faces', 'aria-label':'Med på turen'}, ids.slice(0,6).map(id => face(id))) : null,
+      window.yaffleChangePassword ? h('button', {class:'linkbtn', style:'font-size:14px;color:var(--muted)', onclick:() => window.yaffleChangePassword()}, 'Bytt passord') : null,
       window.yaffleSignOut ? h('button', {class:'linkbtn', style:'font-size:14px;color:var(--muted)', onclick:() => window.yaffleSignOut()}, 'Logg ut') : null)
   );
 }
