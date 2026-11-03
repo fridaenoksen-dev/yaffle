@@ -79,7 +79,7 @@ const S = {
   db:null, user:null, assets:null, me:null, canWrite:true,
   trip:null, items:[], ideas:[], members:{}, profiles:{},
   packing:[], personal:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
-  view: ['plan','ideer','pakk','penger','papirer'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'plan',
+  view: (h => h === 'papirer' ? 'penger' : ['plan','ideer','pakk','penger'].includes(h) ? h : 'plan')(location.hash.slice(1)),
   filter:'all', boardMode:'tavle', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
@@ -199,7 +199,7 @@ async function refreshProfiles(){
 
 window.addEventListener('hashchange', () => {
   const v = location.hash.slice(1);
-  if (['plan','ideer','pakk','penger','papirer'].includes(v) && v !== S.view){ S.view = v; render(); }
+  if (['plan','ideer','pakk','penger'].includes(v) && v !== S.view){ S.view = v; render(); }
 });
 function go(v){ S.view = v; try { history.replaceState(null, '', '#' + v); } catch(e){ location.hash = v; } render(); }
 
@@ -241,7 +241,7 @@ function view(){
   else if (S.view === 'ideer') out.push(...boardView());
   else if (S.view === 'pakk') out.push(...packView());
   else if (S.view === 'penger') out.push(...moneyView());
-  else out.push(...papersView());
+
   if (S.canWrite){
     if (S.view === 'ideer') out.push(h('button', {class:'fab', 'aria-label':'Ny idé', title:'Ny idé', onclick:() => ideaSheet(null)}, '+'));
   }
@@ -386,6 +386,7 @@ function moneyView(){
   if (!costs.length) return [h('div', {class:'empty'}, h('h3', null, 'Ingen priser ennå'), h('p', null, 'Legg inn pris på bookingene i planen, så ser du her hva turen koster.'))];
 
   const total = costs.reduce((a, c) => a + c.nok, 0);
+  const otherPapers = S.items.filter(i => !(Number(i.cost) > 0) && (i.attachments || []).length);
   const n = groupSize();
   const byKind = {};
   for (const c of costs){ const k = c.i.kind || 'other'; byKind[k] = (byKind[k] || 0) + c.nok; }
@@ -409,9 +410,14 @@ function moneyView(){
     h('section', {class:'moneysection'}, h('h3', null, 'Alle kostnader'),
       h('div', {class:'stack'}, costs.map(({i, nok}) => h('div', {class:'payrow'},
         h('div', null, h('b', null, i.title), h('span', {class:'muted'}, isoDate(i.date) ? ' · ' + dayLabel(i.date, true) : '')),
-        h('div', {style:'text-align:right;font-variant-numeric:tabular-nums'},
+        h('div', {style:'text-align:right;font-variant-numeric:tabular-nums;margin-left:auto'},
           h('b', null, money(Math.round(nok), 'NOK')),
-          h('div', {class:'muted', style:'font-size:13px'}, (i.currency && i.currency !== 'NOK' ? money(Number(i.cost), i.currency) + ' · ' : '') + money(Math.round(nok / n), 'NOK') + ' hver'))))))
+          h('div', {class:'muted', style:'font-size:13px'}, (i.currency && i.currency !== 'NOK' ? money(Number(i.cost), i.currency) + ' · ' : '') + money(Math.round(nok / n), 'NOK') + ' hver')),
+        (i.attachments || []).length ? h('div', {class:'files', style:'width:100%'}, i.attachments.map(fileChip)) : null)))),
+    otherPapers.length ? h('section', {class:'moneysection'}, h('h3', null, 'Andre papirer'),
+      h('div', {class:'stack'}, otherPapers.map(i => h('div', {class:'payrow'},
+        h('div', null, h('b', null, i.title), h('span', {class:'muted'}, isoDate(i.date) ? ' · ' + dayLabel(i.date, true) : '')),
+        h('div', {class:'files', style:'width:100%'}, i.attachments.map(fileChip)))))) : null
   ];
 }
 
@@ -419,8 +425,8 @@ function tabs(){
   const nIdeas = S.ideas.filter(i => !isoDate(i.day) || !tripDays().includes(i.day)).length;
   const nFiles = S.items.reduce((a, i) => a + (i.attachments || []).length, 0);
   const t = (id, label, n) => h('button', {class:'tab', role:'tab', 'aria-selected': String(S.view === id), onclick:() => go(id)}, label, n ? h('sup', null, n) : null);
-  const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Gi hjerte til det du vil gjøre, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.', penger:'Hva turen koster, regnet om til kroner.'};
-  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('pakk','Pakk', packLeft() || null), t('penger','Penger'), t('papirer','Papirer', nFiles))];
+  const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Gi hjerte til det du vil gjøre, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.', penger:'Hva turen koster, med kvitteringene.'};
+  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('pakk','Pakk', packLeft() || null), t('penger','Penger'))];
 }
 
 /* ---------- plan ---------- */
@@ -882,6 +888,20 @@ function addRow(id, placeholder, onAdd){
   inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
   return h('div', {class:'quickadd'}, inp, h('button', {class:'btn dark', type:'button', onclick:add}, 'Legg til'));
 }
+// Sletting krever to trykk: × blir til «Slett?», og går tilbake etter noen sekunder.
+function delBtn(label, onDelete){
+  let armed = false, timer = null;
+  const b = h('button', {class:'check-del', type:'button', 'aria-label':'Fjern ' + label, onclick: async e => {
+    e.preventDefault(); e.stopPropagation();
+    if (!armed){
+      armed = true; b.textContent = 'Slett?'; b.classList.add('armed'); b.setAttribute('aria-label', 'Trykk igjen for å slette ' + label);
+      timer = setTimeout(() => { armed = false; b.textContent = '×'; b.classList.remove('armed'); b.setAttribute('aria-label', 'Fjern ' + label); }, 3000);
+      return;
+    }
+    clearTimeout(timer); b.disabled = true; await onDelete();
+  }}, '×');
+  return b;
+}
 function packView(){
   const mine = myList();
   const done = mine.filter(x => x.done).length;
@@ -896,7 +916,7 @@ function packView(){
       mine.length ? h('div', {class:'checklist'}, mine.map(x => h('label', {class:'check' + (x.done ? ' done' : '')},
         h('input', {type:'checkbox', checked: x.done || null, onchange: e => saveMyList(myList().map(y => y.id === x.id ? {...y, done: e.target.checked} : y))}),
         h('span', null, x.text),
-        h('button', {class:'check-del', type:'button', 'aria-label':'Fjern ' + x.text, onclick: e => { e.preventDefault(); saveMyList(myList().filter(y => y.id !== x.id)); }}, '×'))))
+        delBtn(x.text, () => saveMyList(myList().filter(y => y.id !== x.id))))))
       : h('div', {class:'empty'}, h('p', null, 'Listen din er tom.'),
           S.canWrite && S.me ? h('button', {class:'btn ghost', style:'margin-top:12px', onclick:() => saveMyList(PERSONAL_SUGGESTIONS.map((t, k) => ({id:'s' + k, text:t, done:false})))}, 'Bruk forslag til liste') : null)
     ),
@@ -909,7 +929,7 @@ function packView(){
         h('div', {style:'display:flex;align-items:center;gap:8px'},
           x.by ? [face(x.by, true), h('span', {class:'muted', style:'font-size:14px'}, x.by === S.me ? 'Du tar med' : nameOf(x.by) + ' tar med')] : null,
           S.canWrite && S.me ? h('button', {class:'pill ' + (x.by === S.me ? 'ok' : 'neutral'), onclick:() => write('packing/' + x.id, () => S.db.doc('packing/' + x.id).update({by: x.by === S.me ? null : S.me}))}, x.by === S.me ? 'Angre' : x.by ? 'Jeg tar med i stedet' : 'Jeg tar med') : null,
-          S.canWrite ? h('button', {class:'check-del', type:'button', 'aria-label':'Fjern ' + x.text, onclick:() => write('packing/' + x.id, () => S.db.doc('packing/' + x.id).delete())}, '×') : null))))
+          S.canWrite ? delBtn(x.text, () => write('packing/' + x.id, () => S.db.doc('packing/' + x.id).delete())) : null))))
       : h('div', {class:'empty'}, h('p', null, 'Ingen felles ting ennå.'),
           S.canWrite ? h('button', {class:'btn ghost', style:'margin-top:12px', onclick: async () => { for (const t of SHARED_SUGGESTIONS) await addShared(t); }}, 'Bruk forslag') : null)
     )
