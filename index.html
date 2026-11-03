@@ -84,10 +84,16 @@ button{cursor:pointer}
 .face.sm{width:24px;height:24px;font-size:10px;margin-left:-6px;border-width:1.5px}
 
 /* hero */
-.hero{margin:36px 0 8px}
+.hero{margin:22px 0 0}
+.hero-title{display:flex;align-items:flex-end;flex-wrap:wrap;gap:6px 14px}
+.countpill{background:var(--lime);color:var(--forest);font-weight:700;font-size:15px;padding:7px 14px;border-radius:var(--r-pill);margin-bottom:6px;white-space:nowrap}
+.countpill.live{background:var(--forest);color:var(--lime)}
+.stack-btn{border:0;background:none;padding:2px;border-radius:99px;margin-left:auto}
+.stack-btn .face.sm{width:30px;height:30px;font-size:12px;margin-left:-9px;border-width:2px}
+.stack-btn .face.sm:first-child{margin-left:0}
 .eyebrow{font-size:14px;font-weight:600;color:var(--muted)}
-.hero h1{font-family:var(--display);font-weight:900;font-size:clamp(64px,16vw,120px);line-height:.85;letter-spacing:-.05em;color:var(--ink);margin:6px 0 10px;text-transform:uppercase;text-wrap:balance}
-.hero .sub{font-size:17px;color:var(--text);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.hero h1{font-family:var(--display);font-weight:900;font-size:clamp(46px,12.5vw,88px);line-height:.85;letter-spacing:-.05em;color:var(--ink);margin:0;text-transform:uppercase;text-wrap:balance}
+.hero .sub{font-size:16px;color:var(--text);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:8px}
 .linkbtn{background:none;border:0;padding:0;text-decoration:underline;text-underline-offset:3px;font-weight:500;color:var(--ink)}
 
 /* summary card */
@@ -103,7 +109,7 @@ button{cursor:pointer}
 .money b{color:#fff;font-weight:600}
 
 /* word tabs (Next / Past style) */
-.tabs{display:flex;gap:clamp(12px,3.5vw,18px);overflow-x:auto;scrollbar-width:none;align-items:baseline;margin:40px 0 4px;position:sticky;top:0;background:var(--paper);padding:12px 0 10px;z-index:5;border-bottom:1px solid transparent}
+.tabs{display:flex;gap:clamp(12px,3.5vw,18px);overflow-x:auto;scrollbar-width:none;align-items:baseline;margin:18px 0 6px;position:sticky;top:0;background:var(--paper);padding:12px 0 10px;z-index:5;border-bottom:1px solid transparent}
 .tabs.stuck{border-bottom-color:var(--line)}
 .tab{background:none;border:0;padding:0;font-family:var(--display);font-weight:900;font-size:clamp(24px,6.2vw,40px);letter-spacing:-.045em;color:var(--faint);line-height:1;display:flex;align-items:flex-start;gap:4px;opacity:.9}
 .tab[aria-selected="true"]{color:var(--ink)}
@@ -187,7 +193,7 @@ button{cursor:pointer}
 .hscroll .addcard{background:var(--paper);border-color:transparent;margin-top:auto}
 .hscroll .sleep{padding:0 4px}
 .swipehint{font-size:13px;color:var(--muted);margin:-8px 0 10px;display:none}
-@media (max-width:700px){.hscroll .day{flex-basis:84vw}.swipehint{display:block}}
+@media (max-width:700px){.hscroll .day{flex-basis:84vw}}
 
 
 /* penger */
@@ -358,7 +364,11 @@ dialog.sheet[open]{display:flex;flex-direction:column}
 .photo-pick img{width:56px;height:56px;border-radius:14px;object-fit:cover}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:var(--r-pill);font-size:14px;font-weight:500;z-index:50;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
-.fab{position:fixed;right:20px;bottom:24px;z-index:6;box-shadow:var(--shadow)}
+.fab{position:fixed;right:18px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:6;width:58px;height:58px;border-radius:50%;border:0;background:var(--lime);color:var(--forest);font-size:32px;font-weight:500;line-height:1;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.fab:active{transform:scale(.94)}
+.daychips-row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:2px 0 12px;padding:2px 0}
+.daychips-row button{flex:none;border:0;background:var(--fog);border-radius:var(--r-pill);padding:8px 14px;font-size:14px;font-weight:600;color:var(--ink)}
+.daychips-row button.today{background:var(--lime);color:var(--forest)}
 .muted{color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 

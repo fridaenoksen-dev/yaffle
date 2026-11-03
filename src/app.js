@@ -231,7 +231,7 @@ function view(){
     S.canWrite ? h('button', {class:'btn dark', onclick:() => tripSheet()}, 'Sett opp turen') : h('p', null, 'Turen er ikke satt opp ennå.')
   )];
 
-  const out = [topBar(), hero(), summary()];
+  const out = [topBar(), hero()];
   if (S.timedOut) out.push(h('div', {class:'notice'}, 'Får ikke kontakt akkurat nå, så det du ser kan være utdatert.'));
   if (!S.canWrite) out.push(h('div', {class:'notice'}, 'Du kan se turen, men ikke endre den. Be den som administrerer turen om å legge til e-posten din.'));
   out.push(...tabs());
@@ -240,8 +240,7 @@ function view(){
   else if (S.view === 'penger') out.push(...moneyView());
   else out.push(...papersView());
   if (S.canWrite){
-    if (S.view === 'plan') out.push(h('button', {class:'btn primary fab', onclick:() => itemSheet(null, tripDays()[0])}, '+ Legg til booking'));
-    if (S.view === 'ideer') out.push(h('button', {class:'btn primary fab', onclick:() => ideaSheet(null)}, '+ Ny idé'));
+    if (S.view === 'ideer') out.push(h('button', {class:'fab', 'aria-label':'Ny idé', title:'Ny idé', onclick:() => ideaSheet(null)}, '+'));
   }
   return out;
 }
@@ -306,6 +305,7 @@ function meSheet(){
       const ok = await write('members/' + S.me, () => S.db.doc('members/' + S.me).update({nick: v}));
       if (ok) toast('Navnet er lagret');
     }}, field('Navn', 'me-nick', nick), h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre navn'))),
+    S.canWrite && S.trip ? h('button', {class:'btn ghost', type:'button', style:'margin-top:12px', onclick:() => tripSheet()}, 'Endre turen (navn og datoer)') : null,
     h('div', {class:'me-links'},
       window.yaffleChangePassword ? h('button', {class:'btn ghost', type:'button', onclick:() => { sheet.close(); window.yaffleChangePassword(); }}, 'Bytt passord') : null,
       window.yaffleSignOut ? h('button', {class:'btn danger', type:'button', onclick:() => window.yaffleSignOut()}, 'Logg ut') : null)
@@ -321,15 +321,27 @@ function hero(){
       ? a.getUTCDate() + '.–' + b.getUTCDate() + '. ' + MONL[b.getUTCMonth()]
       : a.getUTCDate() + '. ' + MON[a.getUTCMonth()] + ' – ' + b.getUTCDate() + '. ' + MON[b.getUTCMonth()];
   }
+  const cd = countdown();
+  const ids = memberIds();
   return h('header', {class:'hero'},
-    h('div', {class:'eyebrow'}, t.note || 'Tur'),
-    h('h1', null, t.title || 'Turen'),
+    h('div', {class:'hero-title'},
+      h('h1', null, t.title || 'Turen'),
+      h('span', {class:'countpill' + (cd.live ? ' live' : '')}, cd.pill)),
     h('div', {class:'sub'},
-      range ? h('span', null, range) : null,
-            S.canWrite ? h('button', {class:'linkbtn', onclick:() => tripSheet()}, 'Endre tur') : null
-    ),
-    crew()
+      h('span', null, [t.note, range].filter(Boolean).join(' · ')),
+      ids.length ? h('button', {class:'stack-btn', 'aria-label':'Se gjengen', onclick:() => crewSheet()},
+        h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true)))) : null)
   );
+}
+
+function crewSheet(){
+  const ids = memberIds().slice().sort((a, b) => (a === S.me ? -1 : b === S.me ? 1 : nameOf(a).localeCompare(nameOf(b), 'nb')));
+  const missing = Math.max(0, groupSize() - ids.length);
+  openSheet(h('h2', null, 'Gjengen'),
+    h('div', {class:'crew-row', style:'margin-bottom:20px'},
+      ids.map(id => h('div', {class:'crew-person'}, face(id, false, true), h('span', null, id === S.me ? nameOf(id) + ' (deg)' : nameOf(id)))),
+      Array.from({length:missing}, () => h('div', {class:'crew-person'}, h('span', {class:'face big ghost', 'aria-hidden':'true'}, '?'), h('span', {class:'muted'}, 'Ikke logget inn')))),
+    S.me ? h('button', {class:'btn ghost', onclick:() => meSheet()}, 'Endre profilen din') : null);
 }
 
 function countdown(){
@@ -337,10 +349,10 @@ function countdown(){
   const now = new Date(); const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12));
   const diff = Math.round((D(days[0]) - today) / 864e5);
   const left = Math.round((D(days[days.length-1]) - today) / 864e5);
-  if (diff > 1) return {big: diff + ' dager', small:'til dere drar til ' + (S.trip.title || 'turen')};
-  if (diff === 1) return {big:'I morgen!', small:'Pakk sekken'};
-  if (left >= 0) return {big:'Dag ' + (1 - diff) + ' av ' + days.length, small:'God tur!'};
-  return {big:'Hjemme igjen', small:'Håper det var en fin tur'};
+  if (diff > 1) return {big: diff + ' dager', small:'til dere drar til ' + (S.trip.title || 'turen'), pill:'om ' + diff + ' dager'};
+  if (diff === 1) return {big:'I morgen!', small:'Pakk sekken', pill:'i morgen!', live:true};
+  if (left >= 0) return {big:'Dag ' + (1 - diff) + ' av ' + days.length, small:'God tur!', pill:'dag ' + (1 - diff) + ' av ' + days.length, live:true};
+  return {big:'Hjemme igjen', small:'Håper det var en fin tur', pill:'hjemme igjen'};
 }
 
 function summary(){
@@ -404,7 +416,7 @@ function tabs(){
   const nFiles = S.items.reduce((a, i) => a + (i.attachments || []).length, 0);
   const t = (id, label, n) => h('button', {class:'tab', role:'tab', 'aria-selected': String(S.view === id), onclick:() => go(id)}, label, n ? h('sup', null, n) : null);
   const hints = {plan:'Alt dere har booket, dag for dag.', ideer:'Gi hjerte til det du vil gjøre, og flytt favorittene inn på en dag.', papirer:'Boardingkort, kvitteringer og bekreftelser samlet.', penger:'Hva turen koster, regnet om til kroner.'};
-  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('penger','Penger'), t('papirer','Papirer', nFiles)), h('p', {class:'tabhint'}, hints[S.view])];
+  return [h('nav', {class:'tabs', role:'tablist', 'aria-label':'Visning'}, t('plan','Plan'), t('ideer','Idéer', nIdeas), t('penger','Penger'), t('papirer','Papirer', nFiles))];
 }
 
 /* ---------- plan ---------- */
@@ -441,7 +453,12 @@ function planView(){
     h('div', {class:'stack'}, loose.sort((a,b) => sortKey(a) < sortKey(b) ? -1 : 1).map(itemCard))
   ));
   if (!cols.length) return [h('div', {class:'empty'}, h('h3', null, 'Ingen datoer ennå'), h('p', null, 'Legg inn når turen starter og slutter, så får hver dag sin egen kolonne.'))];
-  return [h('p', {class:'swipehint'}, 'Sveip sidelengs for å se alle dagene →'), h('div', {class:'hscroll', id:'plan-scroll', tabindex:'0', 'aria-label':'Reiseplan per dag'}, cols)];
+  const scroller = h('div', {class:'hscroll', id:'plan-scroll', tabindex:'0', 'aria-label':'Reiseplan per dag'}, cols);
+  const jump = idx => { const col = scroller.children[idx]; if (col) scroller.scrollTo({left: col.offsetLeft - scroller.children[0].offsetLeft, behavior:'smooth'}); };
+  const chips = h('div', {class:'daychips-row', role:'group', 'aria-label':'Gå til dag'},
+    days.map((d, idx) => h('button', {class: d === todayIso ? 'today' : null, onclick:() => jump(idx)}, dayLabel(d, true))));
+  if (!S.jumpedToday && days.includes(todayIso)){ S.jumpedToday = true; setTimeout(() => jump(days.indexOf(todayIso)), 60); }
+  return [days.length > 1 ? chips : null, scroller];
 }
 
 function bookedPill(i){
