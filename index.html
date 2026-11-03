@@ -261,7 +261,7 @@ dialog.sheet::backdrop{background:rgba(14,15,12,.45)}
 dialog.sheet[open]{display:flex;flex-direction:column}
 .sheet-head{flex:none;display:flex;align-items:center;justify-content:center;position:relative;padding:12px 22px 6px;background:var(--paper)}
 .sheet-head .grab{margin:0}
-.sheet-in{padding:6px 22px calc(28px + env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;max-height:none}
+.sheet-in{padding:6px 22px calc(28px + env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain;flex:0 1 auto;min-height:0;max-height:none;-webkit-overflow-scrolling:touch}
 .grab{width:40px;height:5px;border-radius:3px;background:var(--fog-2);margin:0 auto 14px}
 .sheet h2{font-family:var(--display);font-weight:900;font-size:32px;letter-spacing:-.04em;line-height:1;color:var(--ink);margin:0 0 18px}
 .close{position:absolute;top:8px;right:14px;width:36px;height:36px;border-radius:50%;border:0;background:var(--fog);font-size:20px;line-height:1;color:var(--ink)}
