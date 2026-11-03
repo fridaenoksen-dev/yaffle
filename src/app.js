@@ -618,13 +618,18 @@ function ideaCard(i){
     : h('div', {class:'art', style:catStyle(c) + 'background:var(--c-bg);min-height:' + heights[hashNum(i.id) % heights.length] + 'px'},
         h('span', {svg: ICONS[c.icon] || ICONS.other, style:'display:inline-flex;justify-content:flex-end;width:100%'}),
         h('b', null, i.title || 'Idé'));
-  const el = h('button', {class:'pin' + (S.flash.has(i.id) ? ' flash' : ''), type:'button', draggable: S.canWrite ? 'true' : null, onclick:() => ideaDetail(i.id),
+  const el = h('div', {class:'pin' + (S.flash.has(i.id) ? ' flash' : ''), role:'button', tabindex:'0', draggable: S.canWrite ? 'true' : null, onclick:() => ideaDetail(i.id),
+      onkeydown: e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget){ e.preventDefault(); ideaDetail(i.id); } },
       'aria-label': (i.title || 'Idé') + ', ' + cname + ', ' + who.length + ' hjerter'},
     h('span', {class:'ph', style:catStyle(c)},
       media,
       h('span', {class:'tag'}, cname),
       allin ? h('span', {class:'allin'}, 'Alle er med!') : null,
-      h('span', {class:'heartcount' + (mine ? ' mine' : '')}, h('span', {svg:ICONS.heart, style:'display:inline-flex'}), who.length + '/' + groupSize())
+      h('button', {class:'heartcount' + (mine ? ' mine' : ''), type:'button', 'aria-pressed': String(!!mine), disabled: !S.canWrite || !S.me,
+        'aria-label': (mine ? 'Fjern hjertet ditt fra ' : 'Gi hjerte til ') + (i.title || 'idéen') + ' (' + who.length + ' av ' + groupSize() + ')',
+        onclick: e => { e.stopPropagation(); if (!S.me) return; write('ideas/' + i.id, () => S.db.doc('ideas/' + i.id).update({hearts:{[S.me]: !mine}})); },
+        onkeydown: e => e.stopPropagation()},
+        h('span', {svg:ICONS.heart, style:'display:inline-flex'}), who.length + '/' + groupSize())
     ),
     h('span', {class:'cap'},
       h('h3', null, i.title || 'Idé'),

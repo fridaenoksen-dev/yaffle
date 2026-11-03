@@ -334,8 +334,11 @@ dialog.sheet[open]{display:flex;flex-direction:column}
 .pin .art b{font-family:var(--display);font-weight:900;font-size:26px;line-height:.95;letter-spacing:-.04em;overflow-wrap:anywhere}
 .pin .tag{position:absolute;left:10px;top:10px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:var(--r-pill);background:var(--c-bg);color:var(--c-ink)}
 .pin .allin{position:absolute;right:10px;top:10px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:var(--r-pill);background:var(--lime);color:var(--forest)}
-.pin .heartcount{position:absolute;right:10px;bottom:10px;display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:5px 9px;border-radius:var(--r-pill);background:rgba(255,255,255,.92);color:#0e0f0c}
-.pin .heartcount svg{width:13px;height:13px;stroke:#cb272f;fill:none;stroke-width:2}
+.pin{cursor:pointer}
+.pin:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:20px}
+.pin .heartcount{border:0;cursor:pointer;position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;padding:8px 12px;min-height:36px;border-radius:var(--r-pill);background:rgba(255,255,255,.92);color:#0e0f0c}
+.pin .heartcount:active{transform:scale(.94)}
+.pin .heartcount svg{width:15px;height:15px;stroke:#cb272f;fill:none;stroke-width:2}
 .pin .heartcount.mine svg{fill:#cb272f}
 .pin.flash .ph{animation:glow 1.4s ease-out 1}
 .pin .cap{padding:8px 4px 0;display:grid;gap:2px}
