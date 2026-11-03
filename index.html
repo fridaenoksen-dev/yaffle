@@ -63,10 +63,24 @@ button{cursor:pointer}
 .top{display:flex;align-items:center;gap:12px;justify-content:space-between}
 .brand{display:flex;align-items:baseline;gap:8px}
 .brand b{font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:-.04em;color:var(--ink)}
-.brand i{font-size:13px;color:var(--muted)}
+.brand i{font-size:13px;color:var(--muted);white-space:nowrap}
+.mebtn{border:0;background:none;padding:0;border-radius:50%;flex:none}
+.mebtn .face{margin:0}
 .faces{display:flex;align-items:center}
 .face{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;border:2px solid var(--paper);margin-left:-8px}
 .face:first-child{margin-left:0}
+.face{object-fit:cover;flex:none}
+.face.big{width:52px;height:52px;font-size:18px;margin:0;border:0}
+.face.ghost{background:var(--fog);color:var(--faint);border:1.5px dashed var(--fog-2)}
+.crew{margin-top:22px}
+.crew-label{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px}
+.crew-row{display:flex;gap:16px;flex-wrap:wrap}
+.crew-person{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:60px;max-width:84px;border:0;background:none;padding:0;text-align:center;font-size:13px;font-weight:600;color:var(--ink);position:relative}
+.crew-person span:not(.face){overflow:hidden;text-overflow:ellipsis;max-width:84px}
+.crew-person small{position:absolute;top:34px;right:6px;background:var(--lime);color:var(--forest);font-size:10px;font-weight:700;padding:2px 6px;border-radius:99px;white-space:nowrap}
+.me-top{display:flex;align-items:center;gap:16px}
+.me-pic .face{width:88px;height:88px;font-size:30px}
+.me-links{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
 .face.sm{width:24px;height:24px;font-size:10px;margin-left:-6px;border-width:1.5px}
 
 /* hero */

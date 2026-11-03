@@ -89,9 +89,13 @@ function nameOf(uid){
   return (S.members[uid] && S.members[uid].nick) || (S.profiles[uid] && S.profiles[uid].name) || 'Noen';
 }
 function colorOf(uid){ return (S.profiles[uid] && S.profiles[uid].color) || hashColor(uid); }
-function face(uid, sm){
+function face(uid, sm, big){
   const n = nameOf(uid);
-  return h('span', {class:'face' + (sm ? ' sm' : ''), style:'background:' + colorOf(uid), title:n, 'aria-label':n}, n.trim()[0] ? n.trim()[0].toUpperCase() : '?');
+  const photo = S.members[uid] && S.members[uid].photo;
+  const src = photo ? blobUrl(photo) : null;
+  const cls = 'face' + (sm ? ' sm' : '') + (big ? ' big' : '');
+  if (src) return h('img', {class:cls, src, alt:n, title:n});
+  return h('span', {class:cls, style:'background:' + colorOf(uid), title:n, role:'img', 'aria-label':n}, n.trim()[0] ? n.trim()[0].toUpperCase() : '?');
 }
 function groupSize(){ return Math.max(1, Number(S.trip && S.trip.groupSize) || Object.keys(S.members).length || 1); }
 function memberIds(){ return Object.keys(S.members); }
@@ -243,13 +247,68 @@ function view(){
 }
 
 function topBar(){
-  const ids = memberIds();
   return h('div', {class:'top'},
     h('div', {class:'brand'}, h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
-    h('div', {style:'display:flex;align-items:center;gap:12px'},
-      ids.length ? h('div', {class:'faces', 'aria-label':'Med på turen'}, ids.slice(0,6).map(id => face(id))) : null,
-      window.yaffleChangePassword ? h('button', {class:'linkbtn', style:'font-size:14px;color:var(--muted)', onclick:() => window.yaffleChangePassword()}, 'Bytt passord') : null,
-      window.yaffleSignOut ? h('button', {class:'linkbtn', style:'font-size:14px;color:var(--muted)', onclick:() => window.yaffleSignOut()}, 'Logg ut') : null)
+    S.me ? h('button', {class:'mebtn', 'aria-label':'Din profil', onclick:() => meSheet()}, face(S.me)) : null
+  );
+}
+
+function crew(){
+  const ids = memberIds(); if (!ids.length) return null;
+  const sorted = ids.slice().sort((a, b) => (a === S.me ? -1 : b === S.me ? 1 : nameOf(a).localeCompare(nameOf(b), 'nb')));
+  const missing = Math.max(0, groupSize() - ids.length);
+  return h('section', {class:'crew', 'aria-label':'Gjengen'},
+    h('div', {class:'crew-label'}, 'Gjengen'),
+    h('div', {class:'crew-row'},
+      sorted.map(id => h(id === S.me ? 'button' : 'div', {class:'crew-person', onclick: id === S.me ? () => meSheet() : null, 'aria-label': id === S.me ? 'Endre profilen din' : null},
+        face(id, false, true),
+        h('span', null, id === S.me ? nameOf(id) + ' (deg)' : nameOf(id)),
+        id === S.me && !(S.members[id] && S.members[id].photo) ? h('small', null, '+ bilde') : null)),
+      Array.from({length:missing}, () => h('div', {class:'crew-person'}, h('span', {class:'face big ghost', 'aria-hidden':'true'}, '?'), h('span', {class:'muted'}, 'Ikke logget inn')))
+    ));
+}
+
+function resizeImage(file, max){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height); const out = Math.min(max, side);
+      const c = document.createElement('canvas'); c.width = out; c.height = out;
+      c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, out, out);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('load')); };
+    img.src = url;
+  });
+}
+
+function meSheet(){
+  const me = S.members[S.me] || {};
+  const nick = h('input', {class:'input', id:'me-nick', value: me.nick || '', maxlength:'24', placeholder:'Navnet ditt'});
+  const pic = h('div', {class:'me-pic'}, face(S.me, false, true));
+  const input = h('input', {type:'file', accept:'image/*', onchange: async ev => {
+    const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+    if (!S.assets){ toast('Du kan ikke laste opp bilder.'); return; }
+    toast('Laster opp bildet …');
+    try {
+      const blob = await resizeImage(f, 512);
+      const r = await S.assets.upload(blob, {type:'image/jpeg'});
+      const ok = await write('members/' + S.me, () => S.db.doc('members/' + S.me).update({photo: r.id}));
+      if (ok){ toast('Profilbildet er lagret'); meSheet(); }
+    } catch(e){ toast('Fikk ikke brukt bildet. Prøv et annet (iPhone-bilder: ta et skjermbilde).'); }
+  }});
+  openSheet(
+    h('h2', null, 'Din profil'),
+    h('div', {class:'me-top'}, pic, h('label', {class:'attach'}, input, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), me.photo ? 'Bytt bilde' : 'Last opp bilde')),
+    h('form', {class:'form', style:'margin-top:16px', onsubmit: async e => {
+      e.preventDefault(); const v = nick.value.trim(); if (!v) return nick.focus();
+      const ok = await write('members/' + S.me, () => S.db.doc('members/' + S.me).update({nick: v}));
+      if (ok) toast('Navnet er lagret');
+    }}, field('Navn', 'me-nick', nick), h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre navn'))),
+    h('div', {class:'me-links'},
+      window.yaffleChangePassword ? h('button', {class:'btn ghost', type:'button', onclick:() => { sheet.close(); window.yaffleChangePassword(); }}, 'Bytt passord') : null,
+      window.yaffleSignOut ? h('button', {class:'btn danger', type:'button', onclick:() => window.yaffleSignOut()}, 'Logg ut') : null)
   );
 }
 
@@ -267,9 +326,9 @@ function hero(){
     h('h1', null, t.title || 'Turen'),
     h('div', {class:'sub'},
       range ? h('span', null, range) : null,
-      h('span', null, groupSize() + ' på tur'),
-      S.canWrite ? h('button', {class:'linkbtn', onclick:() => tripSheet()}, 'Endre tur') : null
-    )
+            S.canWrite ? h('button', {class:'linkbtn', onclick:() => tripSheet()}, 'Endre tur') : null
+    ),
+    crew()
   );
 }
 
