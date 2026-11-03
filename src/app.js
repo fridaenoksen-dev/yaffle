@@ -731,7 +731,11 @@ async function locateStays(){
   if (!S.canWrite) return;
   for (const i of S.items.filter(x => x.kind === 'stay' && !hasPos(x) && !stayTried.has(x.id))){
     stayTried.add(i.id);
-    const pos = await geocode(stayAddress(i));
+    const addr = stayAddress(i);
+    const simple = addr.replace(/^ul\.?\s*/i, '').replace(/\b\d{2}-\d{3}\s*/, '').replace(/\s+,/g, ',').trim();
+    let pos = null;
+    for (const q of [addr, simple, i.title]){ if (q && !pos) pos = await geocode(q); }
+    if (!pos) console.warn('Yaffle: fant ikke overnattingen på kartet', addr);
     if (pos) await write('items/' + i.id, () => S.db.doc('items/' + i.id).update({lat:pos.lat, lng:pos.lng}));
   }
 }
