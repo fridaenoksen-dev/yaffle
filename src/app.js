@@ -720,12 +720,6 @@ function boardView(){
     ? (when(a) < when(b) ? -1 : when(a) > when(b) ? 1 : 0)
     : ((a.createdAt || 0) - (b.createdAt || 0)));
 
-  const quick = S.canWrite ? (() => {
-    const inp = h('input', {class:'input', id:'quick-idea', placeholder:'Fest en idé på tavla …', maxlength:'120', 'aria-label':'Ny idé'});
-    const add = async () => { const v = inp.value.trim(); if (!v) return inp.focus(); inp.value = ''; await addIdea({title:v, category:'Annet', folder: S.folder || null}); };
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
-    return h('div', {class:'quickadd'}, inp, h('button', {class:'btn dark', onclick:add}, 'Fest'));
-  })() : null;
 
   const seg = (id, label) => h('button', {'aria-pressed': String(S.filter === id), onclick:() => { S.filter = id; render(); }}, label);
   const drops = S.canWrite && days.length ? h('div', {class:'drops'},
@@ -734,13 +728,13 @@ function boardView(){
 
   const grid = list.length ? h('div', {class:'masonry'}, list.map(ideaCard)) : h('div', {class:'empty'},
     h('h3', null, S.ideas.length ? 'Ingen idéer her' : 'Tavla er tom'),
-    h('p', null, S.folder ? 'Ingen idéer for ' + folderName(S.folder) + ' ennå. Fest den første.' : S.ideas.length ? 'Prøv et annet filter.' : 'Fest det første forslaget, for eksempel en kafé eller en dagstur.'));
+    h('p', null, S.folder ? 'Ingen idéer for ' + folderName(S.folder) + ' ennå. Trykk + for å feste den første.' : S.ideas.length ? 'Prøv et annet filter.' : 'Trykk + for å feste det første forslaget, for eksempel en kafé eller en dagstur.'));
 
   const mode = (id, label) => h('button', {'aria-pressed': String(S.boardMode === id), onclick:() => { S.boardMode = id; render(); }}, label);
   const bar = h('div', {class:'boardbar'}, h('div', {class:'seg', role:'group', 'aria-label':'Visning'}, mode('tavle','Tavle'), mode('kart','Kart')), h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('planned','Planlagt')));
   const frow = folderRow(folders);
-  if (S.boardMode === 'kart') return [frow, quick, bar, ...mapView(list)];
-  return [frow, quick, bar, drops, grid];
+  if (S.boardMode === 'kart') return [frow, bar, ...mapView(list)];
+  return [frow, bar, drops, grid];
 }
 
 function dropZone(day, label){
