@@ -1,0 +1,26 @@
+{
+  "name": "Yaffle",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#1e5a46",
+  "background_color": "#f6f6f2",
+  "display": "standalone",
+  "short_name": "Yaffle",
+  "start_url": "/"
+}
