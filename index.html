@@ -243,6 +243,13 @@ button{cursor:pointer}
 .tripcard-title{font-family:var(--display);font-weight:900;font-size:clamp(36px,10vw,56px);line-height:.9;letter-spacing:-.05em;text-transform:uppercase;overflow-wrap:anywhere}
 .tripcard-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--text);font-size:15px}
 .tripcard:active{transform:scale(.99)}
+.tripcard{position:relative;overflow:hidden;isolation:isolate}
+.tripcard-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.tripcard.has-cover{min-height:220px;align-content:space-between;color:#fff;background:#0e0f0c}
+.tripcard.has-cover::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,rgba(0,0,0,.05) 40%,rgba(0,0,0,.65) 100%)}
+.tripcard.has-cover .eyebrow,.tripcard.has-cover .tripcard-foot{color:#fff}
+.tripcard.has-cover .tripcard-title{text-shadow:0 2px 16px rgba(0,0,0,.35)}
+.tripcard.has-cover.current{box-shadow:0 0 0 3px var(--lime)}
 .tripadd{min-height:120px;border-radius:28px;font-size:17px}
 
 /* hearts */

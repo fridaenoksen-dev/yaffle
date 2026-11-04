@@ -1143,18 +1143,35 @@ function tripSheet(){
   const note = h('input', {class:'input', value:t.note || '', placeholder:'Jentetur', maxlength:'60'});
   const start = h('input', {class:'input', type:'date', value:t.start || ''});
   const end = h('input', {class:'input', type:'date', value:t.end || ''});
-  const size = h('input', {class:'input', type:'number', min:'1', max:'30', value:String(t.groupSize || 3)});
+  const size = h('input', {class:'input', type:'number', min:'1', max:'30', value:String(t.groupSize || Object.keys(S.members).length || 3)});
+  let cover = t.cover || null;
+  const coverUrl = h('input', {class:'input', value:t.coverUrl || '', placeholder:'Lim inn bildeadresse eller Wikipedia-side', inputmode:'url', maxlength:'600'});
+  const prev = h('span', {class:'photo-pick'});
+  const showPrev = () => prev.replaceChildren(cover && blobUrl(cover) ? h('img', {src:blobUrl(cover), alt:''}) : '');
+  showPrev();
+  const coverInput = h('input', {type:'file', accept:'image/png,image/jpeg,image/webp', onchange: async ev => {
+    const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+    if (!S.assets){ toast('Du kan ikke laste opp bilder.'); return; }
+    toast('Laster opp bildet …');
+    try { const r = await S.assets.upload(f, f.type ? {folder:S.tripId} : {type:'image/jpeg', folder:S.tripId}); cover = r.id; showPrev(); toast('Bildet er klart. Husk å lagre.'); }
+    catch(e){ toast(e && e.code === 'unsupported_type' ? 'Bruk JPG, PNG eller WEBP (iPhone-bilder: ta et skjermbilde).' : 'Fikk ikke lastet opp bildet.'); }
+  }});
   const form = h('form', {class:'form', onsubmit: async e => {
     e.preventDefault();
     if (!title.value.trim()) return title.focus();
     if (start.value && end.value && end.value < start.value){ toast('Hjemreisen må være etter avreisen.'); return end.focus(); }
-    const data = {title:title.value.trim(), note:note.value.trim(), start:start.value, end:end.value, groupSize: Math.max(1, Math.min(30, Number(size.value) || 1))};
+    const data = {title:title.value.trim(), note:note.value.trim(), start:start.value, end:end.value, groupSize: Math.max(1, Math.min(30, Number(size.value) || 1)), cover: cover || null, coverUrl: coverUrl.value.trim()};
     const ok = await write('trip/main', () => S.db.doc('trip/main').update(data));
     if (ok){ sheet.close(); toast('Turen er lagret'); }
   }},
     field('Hvor', 't-title', title), field('Hva slags tur', 't-note', note),
     h('div', {class:'row2'}, field('Avreise', 't-start', start), field('Hjemreise', 't-end', end)),
     field('Hvor mange er med', 't-size', size),
+    h('div', {class:'field'}, h('label', null, 'Bilde på forsiden'),
+      h('div', {class:'photo-pick'}, prev, h('label', {class:'attach'}, coverInput, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), cover ? 'Bytt bilde' : 'Last opp bilde'),
+        cover ? h('button', {class:'linkbtn', type:'button', onclick:() => { cover = null; showPrev(); }}, 'Fjern') : null)),
+    field('Eller bilde fra nett', 't-cover', coverUrl),
+    h('p', {class:'muted', style:'margin:-6px 0 0;font-size:13px'}, 'Uten bilde bruker Yaffle Wikipedia-bildet av stedet.'),
     h('p', {class:'muted', style:'margin:0;font-size:14px'}, '«Alle er med» vises når så mange har gitt hjerte til en idé.'),
     h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre'))
   );
@@ -1173,6 +1190,15 @@ function openTrip(id){
   try { localStorage.setItem('yaffle-trip', id); } catch(e){}
   if (id === S.tripId){ S.view = 'plan'; try { history.replaceState(null, '', location.pathname + '?tur=' + encodeURIComponent(id) + '#plan'); } catch(_){} render(); window.scrollTo({top:0}); return; }
   location.href = location.pathname + '?tur=' + encodeURIComponent(id) + '#plan';
+}
+// Forsidebilde: opplastet > bildelenke > Wikipedia-bildet av stedet
+function tripCover(t){
+  if (t.cover){ const u = blobUrl(t.cover); if (u) return u; }
+  const u = safeUrl(t.coverUrl);
+  if (u && !parseWiki(u)) return u;
+  const key = parseWiki(t.coverUrl) || (t.title ? 'en:' + t.title : null);
+  const w = wikiImage(key);
+  return w ? w.src : null;
 }
 function tripRange(t){
   if (!isoDate(t.start) || !isoDate(t.end)) return '';
@@ -1207,7 +1233,9 @@ function homeView(){
     h('div', {class:'trips'},
       list.map(t => {
         const ids = S.tripMembers[t.id] || [];
-        return h('button', {class:'tripcard' + (t.id === S.tripId ? ' current' : ''), onclick:() => openTrip(t.id)},
+        const cover = tripCover(t);
+        return h('button', {class:'tripcard' + (t.id === S.tripId ? ' current' : '') + (cover ? ' has-cover' : ''), onclick:() => openTrip(t.id)},
+          cover ? h('img', {class:'tripcard-bg', src:cover, alt:'', referrerpolicy:'no-referrer', onerror: e => { e.target.closest('.tripcard').classList.remove('has-cover'); e.target.remove(); }}) : null,
           h('div', {class:'tripcard-top'}, h('span', {class:'eyebrow'}, t.note || 'Tur'), h('span', {class:'countpill' + (tripPill(t) === 'pågår nå' ? ' live' : '')}, tripPill(t))),
           h('div', {class:'tripcard-title'}, t.title || 'Uten navn'),
           h('div', {class:'tripcard-foot'}, h('span', null, tripRange(t) || 'Ingen datoer ennå'), ids.length ? h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true))) : null));
