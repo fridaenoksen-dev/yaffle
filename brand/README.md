@@ -17,11 +17,24 @@ Favicon, app-ikoner og manifest ligger i rotmappen (`favicon.ico`, `favicon.svg`
 
 ## Farger
 
-| Navn | HEX | RGB |
+**Logo**
+
+| Navn | HEX | Bruk |
 |---|---|---|
-| Skoggrønn (hovedfarge) | `#1e5a46` | 30 90 70 |
-| Krem (rutene i app-ikonet) | `#f6f1e3` | 246 241 227 |
-| Lys grønn (mørk modus) | `#3f9f7c` | 63 159 124 |
+| Tiger Gold | `#faae33` | Ikonet og de lyse bokstavene («ay, w», «s») |
+| Ember Rust | `#823513` | «Y» og «affle» på lys bakgrunn, bakgrunn i app-ikonet og favicon |
+| Saffron Glow | `#9f531b` / `#c06a2a` | De lyse bokstavene på mørk bakgrunn |
+
+**Appen**
+
+| Navn | HEX | Bruk |
+|---|---|---|
+| Cardamom Brown | `#6b2e12` | Knapper, valgte faner, kartnåler |
+| Dark Spice | `#402011` | Mørkere variant, turkortet |
+| Charred Clove | `#281006` | Toppen av fargeovergangen på turkortet |
+| Bakgrunn | `#f6f6f2` | Lys offwhite |
+
+De grønne filene (`*-green.svg`) er fra forrige runde og kan slettes når dere er sikre.
 
 ## Skrift
 
@@ -45,12 +58,13 @@ I appen: trykk på profilbildet ditt → **Logo (test)** → Veiskille. Valget l
 
 ## «Yay, waffles»: forkortelsen bak navnet
 
-Yaffle er en forkortelse av «Yay, waffles». Logoen i toppen og footeren viser det: **Y** og **affle** står i skoggrønn, og **ay, w** og **s** i lys salvie (`#9db8a9`, i mørk modus `#4f7d68`).
+Yaffle er en forkortelse av «Yay, waffles». Logoen i toppen og footeren viser det: **Y** og **affle** står i Ember Rust, og **ay, w** og **s** i Tiger Gold. På mørk bakgrunn: gull og safran.
 
 | Fil (`brand/yay-waffle/`) | Bruk |
 |---|---|
-| `yay-waffle-forkortelse-green.svg` | Hovedversjon, forkortelsen synlig |
-| `yay-waffle-forkortelse-dark.svg` | Samme på mørk bakgrunn |
-| `yay-waffle-horizontal-green.svg` | Én farge, under ca. 120 px bredde |
-| `yay-waffle-tolinjer-green.svg` | Kompakt, «Yay,» over «waffles» |
-| `yay-waffle-stacked-green.svg` | Ikon over tekst |
+| `yay-waffles-forkortelse.svg` | Hovedversjon, forkortelsen synlig |
+| `yay-waffles-forkortelse-dark.svg` | Samme på mørk bakgrunn |
+| `yay-waffles-app.svg` | Versjonen appen bruker (fargene følger lys/mørk modus) |
+| `yay-waffles-en-farge.svg` | Én farge (rust), under ca. 120 px bredde |
+| `yay-waffles-tolinjer.svg` | Kompakt, «Yay,» over «waffles» |
+| `yay-waffles-stacked.svg` | Ikon over tekst |

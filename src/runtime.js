@@ -2,12 +2,12 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261104u";
+import * as CONFIG from "./config.js?v=20261104w";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
 const LOGOS = {
-  vaffel: { label: "Vaffelplan", lockup: "/brand/yay-waffle/yay-waffle-forkortelse-green.svg", inline: true, icons: { svg: "/favicon.svg", ico: "/favicon.ico", apple: "/apple-touch-icon.png" },
+  vaffel: { label: "Vaffelplan", lockup: "/brand/yay-waffle/yay-waffles-app.svg", inline: true, icons: { svg: "/favicon.svg", ico: "/favicon.ico", apple: "/apple-touch-icon.png" },
     svg: '<svg viewBox="16 16 224 224"><path fill="currentColor" fill-rule="evenodd" d="M78.5 16 H177.5 C 208.5 16 240 47.5 240 78.5 V177.5 C 240 208.5 208.5 240 177.5 240 H78.5 C 47.5 240 16 208.5 16 177.5 V78.5 C 16 47.5 47.5 16 78.5 16 Z M60.0 42.0 H98.0 A18 18 0 0 1 116.0 60.0 V98.0 A18 18 0 0 1 98.0 116.0 H60.0 A18 18 0 0 1 42.0 98.0 V60.0 A18 18 0 0 1 60.0 42.0 Z M158.0 42.0 H196.0 A18 18 0 0 1 214.0 60.0 V98.0 A18 18 0 0 1 196.0 116.0 H158.0 A18 18 0 0 1 140.0 98.0 V60.0 A18 18 0 0 1 158.0 42.0 Z M60.0 140.0 H98.0 A18 18 0 0 1 116.0 158.0 V196.0 A18 18 0 0 1 98.0 214.0 H60.0 A18 18 0 0 1 42.0 196.0 V158.0 A18 18 0 0 1 60.0 140.0 Z M177.0 214.0 C 147.0 194.0 135.0 174.0 137.0 158.0 C 139.0 142.0 153.0 134.0 163.0 134.0 C 171.0 134.0 175.0 140.0 177.0 146.0 C 179.0 140.0 183.0 134.0 191.0 134.0 C 201.0 134.0 215.0 142.0 217.0 158.0 C 219.0 174.0 207.0 194.0 177.0 214.0 Z"/></svg>' },
   veiskille: { label: "Veiskille", lockup: "/brand/veiskille/veiskille-horizontal-green.svg", icons: { svg: "/brand/veiskille/favicon.svg", ico: "/brand/veiskille/favicon.ico", apple: "/brand/veiskille/apple-touch-icon.png" },
     svg: '<svg viewBox="20 12 216 228"><path fill="none" stroke="currentColor" stroke-width="48" stroke-linecap="round" d="M56 44 C 56 106 128 108 128 156 M200 44 C 200 106 128 108 128 156 L 128 212"/></svg>' },
@@ -598,7 +598,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261104u");
+  await import("./app.js?v=20261104w");
 }
 
 const {

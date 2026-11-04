@@ -72,7 +72,7 @@ function dayLabel(iso, short){
   return short ? cap(w.slice(0,3)) + ' ' + d.getUTCDate() + '.' : cap(w) + ' ' + d.getUTCDate() + '. ' + MON[d.getUTCMonth()];
 }
 function money(n, cur){ return nf.format(n) + ' ' + (CUR[cur] || cur || 'kr'); }
-const PALETTE = ['#1c1c1e','#3a3a3c','#1e5a46','#5f8f6e','#636366','#8a6d3b'];
+const PALETTE = ['#1c1c1e','#3a3a3c','#6b2e12','#9f531b','#636366','#402011'];
 function hashColor(s){ let x=0; for (const c of String(s)) x = (x*31 + c.charCodeAt(0)) | 0; return PALETTE[Math.abs(x) % PALETTE.length]; }
 
 const sheet = document.getElementById('sheet');
@@ -255,7 +255,7 @@ function footSvg(url){
   const footCache = footSvg.cache || (footSvg.cache = {});
   if (!footCache[url]) footCache[url] = fetch(url).then(r => r.ok ? r.text() : '').then(t => t
     .replace(/<\?xml[^>]*>/, '').replace(/<title>[^<]*<\/title>/, '')
-    .replace(/fill="#1e5a46"/g, 'style="fill:var(--accent)"').replace(/fill="#9db8a9"/g, 'style="fill:var(--foot-soft)"')
+    
     .replace(/\swidth="\d+" height="\d+"/, ' aria-hidden="true"')).catch(() => '');
   return footCache[url];
 }
@@ -263,7 +263,7 @@ window.addEventListener('yaffle:logo', () => render());
 function footer(){
   if (S.db && !S.loaded.trip) return null;
   const L = window.yaffleLogo;
-  const logo = L ? L.lockup() : '/brand/yay-waffle/yay-waffle-forkortelse-green.svg';
+  const logo = L ? L.lockup() : '/brand/yay-waffle/yay-waffles-app.svg';
   let mark;
   if (!L || L.inline()){
     // «Yay, waffle» med Y og affle uthevet: inline så fargene følger lys/mørk modus
@@ -311,7 +311,7 @@ function brandLockup(){
   const L = window.yaffleLogo;
   if (L && !L.inline()) return [h('span', {class:'brandmark', 'aria-hidden':'true', svg: L.svg()}), h('b', null, 'Yaffle')];
   const el = h('span', {class:'brandlock', 'aria-hidden':'true'});
-  footSvg(L ? L.lockup() : '/brand/yay-waffle/yay-waffle-forkortelse-green.svg').then(svg => { if (svg) el.innerHTML = svg; });
+  footSvg(L ? L.lockup() : '/brand/yay-waffle/yay-waffles-app.svg').then(svg => { if (svg) el.innerHTML = svg; });
   return el;
 }
 function topBar(){
