@@ -374,7 +374,6 @@ function meSheet(){
       const ok = await saveProfile({nick: v});
       if (ok) toast('Navnet er lagret');
     }}, field('Navn', 'me-nick', nick), h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre navn'))),
-    S.canWrite && S.trip ? h('button', {class:'btn ghost', type:'button', style:'margin-top:12px', onclick:() => tripSheet()}, 'Endre turen (navn og datoer)') : null,
     window.yaffleLogo ? h('div', {class:'field', style:'margin-top:18px'}, h('label', null, 'Logo (test)'),
       h('div', {class:'seg', role:'group', 'aria-label':'Velg logo'}, window.yaffleLogo.list.map(l => h('button', {type:'button', 'aria-pressed': String(window.yaffleLogo.current() === l.id),
         onclick: e => { window.yaffleLogo.set(l.id); e.currentTarget.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); render(); toast('Logoen er byttet på denne enheten'); }}, l.label))),
