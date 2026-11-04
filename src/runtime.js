@@ -25,7 +25,7 @@ const brand = () =>
     h(
       "div",
       { class: "brand" },
-      h("b", null, "Yaffle"),
+      (() => { const m = document.createElement("span"); m.className = "brandmark"; m.setAttribute("aria-hidden", "true"); m.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>'; return m; })(), h("b", null, "Yaffle"),
       h("i", null, "Yay, waffles."),
     ),
   );
@@ -452,14 +452,7 @@ const assets = {
 };
 
 /* ---------- user ---------- */
-const PALETTE = [
-  "#054d28",
-  "#0b4c72",
-  "#cb272f",
-  "#8a5a00",
-  "#5b2c6f",
-  "#2f6f6a",
-];
+const PALETTE = ['#1c1c1e','#3a3a3c','#007aff','#5856d6','#636366','#0060df'];
 const colorFor = (s) => {
   let x = 0;
   for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) | 0;

@@ -69,7 +69,7 @@ function dayLabel(iso, short){
   return short ? cap(w.slice(0,3)) + ' ' + d.getUTCDate() + '.' : cap(w) + ' ' + d.getUTCDate() + '. ' + MON[d.getUTCMonth()];
 }
 function money(n, cur){ return nf.format(n) + ' ' + (CUR[cur] || cur || 'kr'); }
-const PALETTE = ['#054d28','#0b4c72','#cb272f','#8a5a00','#5b2c6f','#2f6f6a'];
+const PALETTE = ['#1c1c1e','#3a3a3c','#007aff','#5856d6','#636366','#0060df'];
 function hashColor(s){ let x=0; for (const c of String(s)) x = (x*31 + c.charCodeAt(0)) | 0; return PALETTE[Math.abs(x) % PALETTE.length]; }
 
 const sheet = document.getElementById('sheet');
@@ -279,7 +279,7 @@ function view(){
 
 function topBar(){
   return h('div', {class:'top'},
-    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); goHome(); }}, h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
+    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); goHome(); }}, h('span', {class:'brandmark', 'aria-hidden':'true', svg:'<svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>'}), h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
     S.me ? h('button', {class:'mebtn', 'aria-label':'Din profil', onclick:() => meSheet()}, face(S.me)) : null
   );
 }
