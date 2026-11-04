@@ -768,8 +768,8 @@ function mapView(list){
       const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
       const ck = window.yaffleCartoKey;
       if (ck){
-        // CARTO Positron / Dark Matter (gratis nøkkel, opptil 5 mill. fliser i måneden)
-        L.tileLayer('https://basemaps.cartocdn.com/rastertiles/' + (dark ? 'dark_all' : 'light_all') + '/{z}/{x}/{y}.png?key=' + encodeURIComponent(ck), {maxZoom:20,
+        // CARTO Voyager / Dark Matter (gratis nøkkel, opptil 5 mill. fliser i måneden)
+        L.tileLayer('https://basemaps.cartocdn.com/rastertiles/' + (dark ? 'dark_all' : 'voyager') + '/{z}/{x}/{y}.png?key=' + encodeURIComponent(ck), {maxZoom:20,
           attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
       } else {
         // OpenStreetMap-fliser (gratis, uten nøkkel), gjort lyse og grå med CSS-filter
