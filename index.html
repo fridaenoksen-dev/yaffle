@@ -237,6 +237,16 @@ button{cursor:pointer}
 .boardbar{gap:8px}
 
 
+/* planlagte idéer i planen */
+.card.planned,.hscroll .card.planned{overflow:hidden;grid-template-columns:1fr auto}
+.card.planned .moveback,.card.planned .planned-img{grid-column:1 / -1}
+.catdot{display:inline-flex;align-items:center;gap:6px}
+.catdot::before{content:"";width:8px;height:8px;border-radius:3px;background:var(--c-ink)}
+.planned-img{margin:-14px -14px 4px;height:140px;background:var(--c-bg,var(--fog))}
+.planned-img img{width:100%;height:100%;object-fit:cover;display:block}
+.tile.idea svg{stroke:currentColor}
+.moveback{margin-top:6px;border:0;border-top:1px solid var(--line);background:none;padding:12px 0 2px;font-size:14px;font-weight:600;color:var(--muted);text-align:center;cursor:pointer;width:100%}
+.moveback.armed{color:#fff;background:var(--red);border-radius:50px;border-top-color:transparent;padding:10px 14px;margin-top:10px}
 /* forsiden */
 .trips{display:grid;gap:14px;margin-top:8px}
 @media (min-width:700px){.trips{grid-template-columns:repeat(2,1fr)}}
@@ -595,6 +605,6 @@ dialog.sheet{border-radius:30px 30px 0 0}
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261104d"></script>
+<script type="module" src="./src/runtime.js?v=20261104e"></script>
 </body>
 </html>

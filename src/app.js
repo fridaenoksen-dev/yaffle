@@ -568,16 +568,29 @@ function itemCard(i){
 }
 
 function plannedIdeaCard(i){
-  return h('article', {class:'card'},
-    h('div', {class:'tile idea', svg:ICONS.idea, 'aria-hidden':'true'}),
+  const img = ideaImage(i);
+  const [cname, c] = catOf(i.category);
+  // To trykk for å flytte ut: første trykk spør, andre flytter. Går tilbake etter noen sekunder.
+  let armed = false, timer = null;
+  const back = S.canWrite ? h('button', {class:'moveback', type:'button', onclick: async e => {
+    e.stopPropagation();
+    if (!armed){
+      armed = true; back.classList.add('armed'); back.textContent = 'Sikker? Trykk igjen for å flytte ut';
+      timer = setTimeout(() => { armed = false; back.classList.remove('armed'); back.textContent = 'Flytt tilbake til idéer'; }, 3500);
+      return;
+    }
+    clearTimeout(timer); back.disabled = true; await moveIdea(i, null); toast('«' + (i.title || 'Idéen') + '» er flyttet tilbake til idéer');
+  }}, 'Flytt tilbake til idéer') : null;
+  return h('article', {class:'card planned', style:catStyle(c)},
+    img ? h('div', {class:'planned-img'}, h('img', {src:img.src, alt:'', loading:'lazy', referrerpolicy:'no-referrer', onerror: e => e.target.closest('.planned-img').remove()})) : null,
     h('div', {class:'body-col'},
-      h('div', {class:'kicker'}, i.time ? h('span', {class:'time'}, i.time) : null, h('span', null, i.category || 'Fra idétavla')),
+      h('div', {class:'kicker'}, i.time ? h('span', {class:'time'}, i.time) : null, h('span', {class:'catdot', style:catStyle(c)}, cname)),
       h('h3', null, i.title || 'Idé'),
       i.note ? h('p', {class:'details'}, i.note) : null,
       safeUrl(i.link) ? h('div', {class:'meta'}, h('a', {href:safeUrl(i.link), target:'_blank', rel:'noopener', style:'color:var(--ink)'}, 'Åpne lenke')) : null
     ),
     S.canWrite ? h('button', {class:'iconbtn edit', onclick:() => ideaSheet(i)}, 'Endre') : h('span'),
-    S.canWrite ? h('div', {class:'pills'}, S.canWrite ? h('button', {class:'pill neutral', onclick:() => moveIdea(i, null)}, 'Tilbake til tavla') : null) : null
+    back
   );
 }
 
