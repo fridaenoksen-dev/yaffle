@@ -8,4 +8,4 @@ export const SUPABASE_ANON_KEY =
 export const BUCKET = "receipts";
 
 // Gratis nøkkel for de lyse kartene: https://carto.com/basemaps/apikey (ingen konto). Tom = OpenStreetMap i gråtoner.
-export const CARTO_KEY = "";
+export const CARTO_KEY = "cb1_51t2_1_61d08d68f6e0eec74f0cd873";
