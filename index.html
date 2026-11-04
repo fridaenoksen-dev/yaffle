@@ -722,12 +722,28 @@ dialog.sheet{border-radius:30px 30px 0 0}
 .boardbar .seg:first-child button[aria-pressed="true"]{background:#000;color:#fff}
 .datechip .leaf b{font-family:var(--body);font-weight:700;font-size:20px;letter-spacing:-.02em}
 .face{box-shadow:none}
+
+/* Mørkebrun meny og footer (Dark Spice), lys bakgrunn ellers */
+.top,.tabs{background:#402011!important;box-shadow:0 0 0 5px var(--canvas)!important}
+.top{--logo-main:#faae33;--logo-soft:#c06a2a}
+.top .brand b{color:#fff3e0}
+.top .brandmark{color:#faae33}
+.top .face{border-color:#402011}
+.tabs .tab{color:#e2b98f}
+.tabs .tab sup{color:#c79469}
+.tabs .tab[aria-selected="true"]{background:#faae33;color:#281006}
+.tabs .tab[aria-selected="true"] sup{color:#6b2e12}
+html,body{overflow-x:clip}
+.foot{background:#402011;border-top:0;width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);padding-left:max(20px,calc(50vw - 300px));padding-right:max(20px,calc(50vw - 300px));--logo-main:#faae33;--logo-soft:#c06a2a}
+.foot p{color:#e2b98f}
+.foot .foot-meta{color:#c79469}
+.foot-logo:not(.inline){background:#faae33}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261104w"></script>
+<script type="module" src="./src/runtime.js?v=20261104x"></script>
 </body>
 </html>
