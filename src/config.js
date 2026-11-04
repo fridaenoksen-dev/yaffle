@@ -6,3 +6,6 @@ export const SUPABASE_URL = "https://lbslhgawkujpuodbtozy.supabase.co";
 export const SUPABASE_ANON_KEY =
   "sb_publishable_iEzz9gfKaVPcI2aoneSvKg_RMAbL2xF";
 export const BUCKET = "receipts";
+
+// Gratis nøkkel for de lyse kartene: https://carto.com/basemaps/apikey (ingen konto). Tom = OpenStreetMap i gråtoner.
+export const CARTO_KEY = "";

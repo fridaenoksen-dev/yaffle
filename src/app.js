@@ -766,9 +766,16 @@ function mapView(list){
     if (!map){
       map = L.map(mapEl, {scrollWheelZoom:false, zoomControl:false, attributionControl:true});
       const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-      // OpenStreetMap-fliser (gratis, uten nøkkel), gjort lyse og grå med CSS-filter
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, className: dark ? 'tiles-mono dark' : 'tiles-mono',
-        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+      const ck = window.yaffleCartoKey;
+      if (ck){
+        // CARTO Positron / Dark Matter (gratis nøkkel, opptil 5 mill. fliser i måneden)
+        L.tileLayer('https://basemaps.cartocdn.com/rastertiles/' + (dark ? 'dark_all' : 'light_all') + '/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(ck), {maxZoom:20,
+          attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
+      } else {
+        // OpenStreetMap-fliser (gratis, uten nøkkel), gjort lyse og grå med CSS-filter
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, className: dark ? 'tiles-mono dark' : 'tiles-mono',
+          attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+      }
       L.control.zoom({position:'topright'}).addTo(map);
       mapLayers = {lines:L.layerGroup().addTo(map), marks:L.layerGroup().addTo(map)};
       markerLayer = mapLayers.marks;

@@ -2,7 +2,8 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } from "./config.js";
+import * as CONFIG from "./config.js";
+const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 const app = document.getElementById("app");
 const h = (tag, attrs = {}, ...kids) => {
@@ -537,6 +538,7 @@ async function start(session) {
   let nick = null; try { nick = sessionStorage.getItem("yaffle-nick"); sessionStorage.removeItem("yaffle-nick"); } catch (e) {}
   if (nick) { await sb.from("docs").upsert({ path: "profiles/" + session.user.id, collection: "profiles", data: { nick } }); }
   window.yaffleRpc = (name, args) => sb.rpc(name, args);
+  window.yaffleCartoKey = CONFIG.CARTO_KEY || "";
   window.yaffleNotice = alert_msg;
   loaded = loadAll();
   try {
