@@ -242,13 +242,22 @@ function render(){
   const hs = document.getElementById('plan-scroll'); const hx = hs ? hs.scrollLeft : null;
   const keep = {}; app.querySelectorAll('input[id]').forEach(el => { if (el.value) keep[el.id] = el.value; });
   const focusId = document.activeElement && app.contains(document.activeElement) ? document.activeElement.id : null;
-  app.replaceChildren(...view().flat(9).filter(k => k != null && k !== false));
+  app.replaceChildren(...[...view(), footer()].flat(9).filter(k => k != null && k !== false));
   for (const [id, v] of Object.entries(keep)){ const el = document.getElementById(id); if (el && !el.value) el.value = v; }
   if (focusId){ const el = document.getElementById(focusId); if (el) el.focus({preventScroll:true}); }
   app.classList.toggle('wide', S.view === 'ideer' || S.view === 'plan');
   window.scrollTo(0, y);
   const hs2 = document.getElementById('plan-scroll'); if (hs2 && hx != null) hs2.scrollLeft = hx;
   S.flash.clear();
+}
+
+function footer(){
+  if (S.db && !S.loaded.trip) return null;
+  const logo = window.yaffleLogo ? window.yaffleLogo.lockup() : '/brand/yaffle-horizontal-green.svg';
+  return h('footer', {class:'foot'},
+    h('span', {class:'foot-logo', role:'img', 'aria-label':'Yaffle', style:"--logo:url('" + logo + "')"}),
+    h('p', null, 'Yaffle samler turen på ett sted: plan og bookinger, idéer dere vil gjøre, pakkeliste og hva det koster. Hele gjengen ser det samme, så ingen trenger å lete i chatten.'),
+    h('p', {class:'foot-meta'}, 'Laget for venninnegjengen · Yay, waffles.'));
 }
 
 function view(){
