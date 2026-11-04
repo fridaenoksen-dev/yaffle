@@ -231,6 +231,20 @@ button{cursor:pointer}
 .leaflet-container{font-family:var(--body)}
 .boardbar{gap:8px}
 
+
+/* forsiden */
+.trips{display:grid;gap:14px;margin-top:8px}
+@media (min-width:700px){.trips{grid-template-columns:repeat(2,1fr)}}
+.tripcard{border:0;text-align:left;background:var(--fog);border-radius:28px;padding:20px;display:grid;gap:10px;color:var(--ink);cursor:pointer}
+.tripcard.current{background:var(--forest);color:#fff}
+.tripcard.current .eyebrow,.tripcard.current .tripcard-foot{color:#cfe0c3}
+.tripcard-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tripcard-top .countpill{margin:0;font-size:13px;padding:5px 12px}
+.tripcard-title{font-family:var(--display);font-weight:900;font-size:clamp(36px,10vw,56px);line-height:.9;letter-spacing:-.05em;text-transform:uppercase;overflow-wrap:anywhere}
+.tripcard-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--text);font-size:15px}
+.tripcard:active{transform:scale(.99)}
+.tripadd{min-height:120px;border-radius:28px;font-size:17px}
+
 /* hearts */
 .hearts{display:flex;align-items:center;gap:8px}
 .heart{border:0;background:var(--fog);border-radius:var(--r-pill);padding:6px 12px 6px 10px;display:inline-flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:var(--ink)}

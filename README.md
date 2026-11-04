@@ -61,3 +61,19 @@ npx serve .
 - Glemt passord: gå til Authentication → Users, velg personen → «Update password» (eller slett og lag på nytt).
 - Anon-nøkkelen i `src/config.js` er laget for å være offentlig. Sikkerheten ligger i reglene i `schema.sql`.
   Bruk aldri `service_role`-nøkkelen i frontend.
+
+
+## Flere turer og invitasjoner
+
+Yaffle har en forside med alle turene dine. Alle kan lage konto, men ser bare turer de er invitert til.
+
+Oppsett (én gang):
+
+1. Kjør `supabase/migrate-flere-turer.sql` i SQL Editor. Gdańsk-turen flyttes inn som `gdansk-2026`.
+2. Authentication → Sign In / Providers → Email: slå **på** «Allow new users to sign up» og slå **av** «Confirm email».
+   Ellers må nye folk bekrefte e-post, og da treffer dere fort grensen for e-poster.
+
+Inviter: åpne en tur → trykk på bildestabelen → «Inviter flere» → del lenken.
+Lenken kan byttes ut med «Lag ny lenke», da slutter den gamle å virke.
+
+`allowed_emails` brukes ikke lenger.

@@ -79,19 +79,20 @@ const S = {
   db:null, user:null, assets:null, me:null, canWrite:true,
   trip:null, items:[], ideas:[], members:{}, profiles:{},
   packing:[], personal:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
-  view: (h => h === 'papirer' ? 'penger' : ['plan','ideer','pakk','penger'].includes(h) ? h : 'plan')(location.hash.slice(1)),
+  view: (h => h === 'papirer' ? 'penger' : ['plan','ideer','pakk','penger','hjem'].includes(h) ? h : 'plan')(location.hash.slice(1)),
+  tripId: null, trips:[], profileDocs:{}, memberDocs:{}, tripMembers:{}, homeTab:'next',
   filter:'all', boardMode:'tavle', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
 
 function nameOf(uid){
   if (!uid) return 'Claude';
-  return (S.members[uid] && S.members[uid].nick) || (S.profiles[uid] && S.profiles[uid].name) || 'Noen';
+  return (S.members[uid] && S.members[uid].nick) || (S.profileDocs[uid] && S.profileDocs[uid].nick) || (S.profiles[uid] && S.profiles[uid].name) || 'Noen';
 }
 function colorOf(uid){ return (S.profiles[uid] && S.profiles[uid].color) || hashColor(uid); }
 function face(uid, sm, big){
   const n = nameOf(uid);
-  const photo = S.members[uid] && S.members[uid].photo;
+  const photo = (S.members[uid] && S.members[uid].photo) || (S.profileDocs[uid] && S.profileDocs[uid].photo);
   const src = photo ? blobUrl(photo) : null;
   const cls = 'face' + (sm ? ' sm' : '') + (big ? ' big' : '');
   if (src) return h('img', {class:cls, src, alt:n, title:n});
@@ -154,9 +155,30 @@ render();
   };
   const onErr = key => e => { S.loaded[key] = true; clearTimeout(timer); if (e && e.code !== 'revoked') toast('Mistet kontakten med turen. Last inn siden på nytt.'); render(); };
 
-  db.doc('trip/main').onSnapshot(s => { S.trip = s.exists ? s.data() : null; done('trip', s); render(); }, onErr('trip'));
-  db.collection('items').onSnapshot(s => { S.items = s.docs.map(d => ({id:d.id, ...d.data()})); done('items', s); render(); }, onErr('items'));
-  db.collection('ideas').onSnapshot(s => {
+  // Hvilken tur: ?tur=ID i adressen, ellers den du så på sist
+  const q = new URLSearchParams(location.search).get('tur');
+  let tid = q; try { if (q) localStorage.setItem('yaffle-trip', q); else tid = localStorage.getItem('yaffle-trip'); } catch(e){}
+  S.rdb = db; S.tripId = tid || null;
+  if (window.yaffleNotice) setTimeout(() => toast(window.yaffleNotice), 300);
+
+  db.collection('trips').onSnapshot(s => {
+    S.trips = s.docs.map(d => ({id:d.id, ...d.data()}));
+    for (const t of S.trips) if (!(t.id in S.tripMembers)){
+      S.tripMembers[t.id] = [];
+      db.collection('trips/' + t.id + '/members').onSnapshot(m => { S.tripMembers[t.id] = m.docs.map(d => d.id); render(); }, () => {});
+    }
+    S.loaded.trips = true; render();
+  }, () => { S.loaded.trips = true; render(); });
+  db.collection('profiles').onSnapshot(s => { S.profileDocs = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); S.loaded.profiles = true; mergeMembers(); render(); }, () => {});
+
+  if (!S.tripId){ S.view = 'hjem'; for (const k of ['trip','items','ideas','members']) S.loaded[k] = true; S.confirmed = true; clearTimeout(timer); render(); return; }
+  const base = 'trips/' + S.tripId + '/';
+  S.db = { doc: p => p === 'trip/main' ? db.doc('trips/' + S.tripId) : db.doc(base + p), collection: p => db.collection(base + p) };
+  window.yaffleTrip = S.tripId;
+
+  S.db.doc('trip/main').onSnapshot(s => { S.trip = s.exists ? s.data() : null; done('trip', s); render(); }, onErr('trip'));
+  S.db.collection('items').onSnapshot(s => { S.items = s.docs.map(d => ({id:d.id, ...d.data()})); done('items', s); render(); }, onErr('items'));
+  S.db.collection('ideas').onSnapshot(s => {
     S.ideas = s.docs.map(d => ({id:d.id, ...d.data()}));
     const now = new Set(S.ideas.filter(isAllIn).map(i => i.id));
     if (S.prevAllIn) for (const id of now) if (!S.prevAllIn.has(id)) S.flash.add(id);
@@ -164,18 +186,24 @@ render();
     done('ideas', s); render();
     if (detailId && sheet.open) ideaDetail(detailId);
   }, onErr('ideas'));
-  db.collection('packing').onSnapshot(s => { S.packing = s.docs.map(d => ({id:d.id, ...d.data()})); render(); }, () => {});
-  db.collection('personal').onSnapshot(s => { S.personal = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); render(); }, () => {});
-  db.collection('members').onSnapshot(s => {
-    S.members = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
-    done('members', s);
-    if (!s.metadata.fromCache) maybeJoin();
-    refreshProfiles(); render();
+  S.db.collection('packing').onSnapshot(s => { S.packing = s.docs.map(d => ({id:d.id, ...d.data()})); render(); }, () => {});
+  S.db.collection('personal').onSnapshot(s => { S.personal = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); render(); }, () => {});
+  S.db.collection('members').onSnapshot(s => {
+    S.memberDocs = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
+    mergeMembers(); done('members', s); refreshProfiles(); render();
   }, onErr('members'));
 })();
 
+function mergeMembers(){
+  S.members = Object.fromEntries(Object.keys(S.memberDocs).map(id => [id, {...S.memberDocs[id], ...(S.profileDocs[id] || {})}]));
+}
+async function saveProfile(patch){
+  if (!S.me || !S.rdb) return false;
+  const ref = S.rdb.doc('profiles/' + S.me);
+  return write('profiles/' + S.me, () => S.profileDocs[S.me] ? ref.update(patch) : ref.set({...patch}));
+}
 async function maybeJoin(){
-  if (S.joined || !S.me || !S.canWrite || S.members[S.me]) return;
+  return;
   S.joined = true;
   let nick = '';
   try { const me = await S.user.me(); nick = me.name ? me.name.split(' ')[0] : ''; } catch(e){}
@@ -199,7 +227,7 @@ async function refreshProfiles(){
 
 window.addEventListener('hashchange', () => {
   const v = location.hash.slice(1);
-  if (['plan','ideer','pakk','penger'].includes(v) && v !== S.view){ S.view = v; render(); }
+  if (['plan','ideer','pakk','penger','hjem'].includes(v) && v !== S.view){ S.view = v; render(); }
 });
 function go(v){ S.view = v; try { history.replaceState(null, '', '#' + v); } catch(e){ location.hash = v; } render(); }
 
@@ -225,12 +253,13 @@ function view(){
   if (loading && !S.timedOut) return [topBar(), h('p', {class:'muted', style:'margin-top:60px'}, 'Henter turen …')];
   if (S.db && !S.loaded.trip && S.timedOut) return [topBar(), h('div', {class:'notice'}, 'Får ikke kontakt med turen akkurat nå. Sjekk nettet, så prøver siden igjen av seg selv.')];
 
-  if (S.me && S.canWrite && S.loaded.members && !S.skipNick && S.members[S.me] && !S.members[S.me].nick) return [topBar(), onboard()];
+  if (S.me && S.canWrite && S.loaded.profiles && !S.skipNick && !(S.profileDocs[S.me] && S.profileDocs[S.me].nick)) return [topBar(), onboard()];
+  if (S.view === 'hjem' || !S.tripId) return [topBar(), ...homeView()];
 
   if (!S.trip) return [topBar(), h('div', {class:'onboard'},
-    h('h2', null, 'Hvor skal dere?'),
-    h('p', null, 'Sett opp turen først, så kan dere legge inn reiseplan og idéer.'),
-    S.canWrite ? h('button', {class:'btn dark', onclick:() => tripSheet()}, 'Sett opp turen') : h('p', null, 'Turen er ikke satt opp ennå.')
+    h('h2', null, 'Fant ikke turen'),
+    h('p', null, 'Enten finnes den ikke, eller så er du ikke med på den. Be om en invitasjonslenke fra noen i gjengen.'),
+    h('button', {class:'btn dark', onclick:() => goHome()}, 'Til turene dine')
   )];
 
   const out = [topBar(), hero()];
@@ -250,7 +279,7 @@ function view(){
 
 function topBar(){
   return h('div', {class:'top'},
-    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); if (sheet.open) sheet.close(); S.view = 'plan'; S.boardMode = 'tavle'; try { history.replaceState(null, '', '#plan'); } catch(_){} render(); window.scrollTo({top:0, behavior:'smooth'}); const hs = document.getElementById('plan-scroll'); if (hs) hs.scrollTo({left:0}); }}, h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
+    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); goHome(); }}, h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
     S.me ? h('button', {class:'mebtn', 'aria-label':'Din profil', onclick:() => meSheet()}, face(S.me)) : null
   );
 }
@@ -286,7 +315,7 @@ function resizeImage(file, max){
 }
 
 function meSheet(){
-  const me = S.members[S.me] || {};
+  const me = S.profileDocs[S.me] || S.members[S.me] || {};
   const nick = h('input', {class:'input', id:'me-nick', value: me.nick || '', maxlength:'24', placeholder:'Navnet ditt'});
   const pic = h('div', {class:'me-pic'}, face(S.me, false, true));
   const input = h('input', {type:'file', accept:'image/*', onchange: async ev => {
@@ -295,8 +324,8 @@ function meSheet(){
     toast('Laster opp bildet …');
     try {
       const blob = await resizeImage(f, 512);
-      const r = await S.assets.upload(blob, {type:'image/jpeg'});
-      const ok = await write('members/' + S.me, () => S.db.doc('members/' + S.me).update({photo: r.id}));
+      const r = await S.assets.upload(blob, {type:'image/jpeg', folder:'profiles/' + S.me});
+      const ok = await saveProfile({photo: r.id});
       if (ok){ toast('Profilbildet er lagret'); meSheet(); }
     } catch(e){ toast('Fikk ikke brukt bildet. Prøv et annet (iPhone-bilder: ta et skjermbilde).'); }
   }});
@@ -305,7 +334,7 @@ function meSheet(){
     h('div', {class:'me-top'}, pic, h('label', {class:'attach'}, input, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), me.photo ? 'Bytt bilde' : 'Last opp bilde')),
     h('form', {class:'form', style:'margin-top:16px', onsubmit: async e => {
       e.preventDefault(); const v = nick.value.trim(); if (!v) return nick.focus();
-      const ok = await write('members/' + S.me, () => S.db.doc('members/' + S.me).update({nick: v}));
+      const ok = await saveProfile({nick: v});
       if (ok) toast('Navnet er lagret');
     }}, field('Navn', 'me-nick', nick), h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre navn'))),
     S.canWrite && S.trip ? h('button', {class:'btn ghost', type:'button', style:'margin-top:12px', onclick:() => tripSheet()}, 'Endre turen (navn og datoer)') : null,
@@ -345,7 +374,9 @@ function crewSheet(){
     h('div', {class:'crew-row', style:'margin-bottom:20px'},
       ids.map(id => h('div', {class:'crew-person'}, face(id, false, true), h('span', null, id === S.me ? nameOf(id) + ' (deg)' : nameOf(id)))),
       Array.from({length:missing}, () => h('div', {class:'crew-person'}, h('span', {class:'face big ghost', 'aria-hidden':'true'}, '?'), h('span', {class:'muted'}, 'Ikke logget inn')))),
-    S.me ? h('button', {class:'btn ghost', onclick:() => meSheet()}, 'Endre profilen din') : null);
+    h('div', {style:'display:flex;flex-wrap:wrap;gap:10px'},
+      S.tripId ? h('button', {class:'btn primary', onclick:() => inviteSheet()}, 'Inviter flere') : null,
+      S.me ? h('button', {class:'btn ghost', onclick:() => meSheet()}, 'Endre profilen din') : null));
 }
 
 function countdown(){
@@ -963,7 +994,7 @@ async function attach(item, files){
     let type = f.type || (/\.pdf$/i.test(f.name) ? 'application/pdf' : /\.jpe?g$/i.test(f.name) ? 'image/jpeg' : /\.png$/i.test(f.name) ? 'image/png' : '');
     toast('Laster opp ' + f.name + ' …');
     try {
-      const r = await S.assets.upload(f, type ? {type} : undefined);
+      const r = await S.assets.upload(f, type ? {type, folder:S.tripId} : {folder:S.tripId});
       added.push({id:r.id, name:f.name.slice(0,80), type:r.contentType});
     } catch(e){
       const c = e && e.code;
@@ -1075,7 +1106,7 @@ function ideaSheet(idea){
     const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
     if (!S.assets){ toast('Bare redaktører kan laste opp bilder.'); return; }
     toast('Laster opp bildet …');
-    try { const r = await S.assets.upload(f, f.type ? undefined : {type:'image/jpeg'}); photo = r.id; showPrev(); photoLbl.lastChild.textContent = 'Bytt bilde'; toast('Bildet er klart. Husk å lagre.'); }
+    try { const r = await S.assets.upload(f, f.type ? {folder:S.tripId} : {type:'image/jpeg', folder:S.tripId}); photo = r.id; showPrev(); photoLbl.lastChild.textContent = 'Bytt bilde'; toast('Bildet er klart. Husk å lagre.'); }
     catch(e){ toast(e && e.code === 'unsupported_type' ? 'Bruk JPG, PNG eller WEBP (iPhone-bilder: ta et skjermbilde).' : e && e.code === 'too_large' ? 'Bildet er for stort (maks 20 MB).' : 'Fikk ikke lastet opp bildet.'); }
   }});
   const photoLbl = h('label', {class:'attach'}, photoInput, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), document.createTextNode(photo ? 'Bytt bilde' : 'Legg til bilde'));
@@ -1118,7 +1149,7 @@ function tripSheet(){
     if (!title.value.trim()) return title.focus();
     if (start.value && end.value && end.value < start.value){ toast('Hjemreisen må være etter avreisen.'); return end.focus(); }
     const data = {title:title.value.trim(), note:note.value.trim(), start:start.value, end:end.value, groupSize: Math.max(1, Math.min(30, Number(size.value) || 1))};
-    const ok = await write('trip/main', () => S.db.doc('trip/main').set(data));
+    const ok = await write('trip/main', () => S.db.doc('trip/main').update(data));
     if (ok){ sheet.close(); toast('Turen er lagret'); }
   }},
     field('Hvor', 't-title', title), field('Hva slags tur', 't-note', note),
@@ -1130,13 +1161,106 @@ function tripSheet(){
   openSheet(h('h2', null, S.trip ? 'Endre tur' : 'Ny tur'), form);
 }
 
+
+/* ---------- forsiden: alle turene dine ---------- */
+function goHome(){
+  if (sheet.open) sheet.close();
+  S.view = 'hjem';
+  try { history.replaceState(null, '', location.pathname + (S.tripId ? '?tur=' + encodeURIComponent(S.tripId) : '') + '#hjem'); } catch(_){}
+  render(); window.scrollTo({top:0, behavior:'smooth'});
+}
+function openTrip(id){
+  try { localStorage.setItem('yaffle-trip', id); } catch(e){}
+  if (id === S.tripId){ S.view = 'plan'; try { history.replaceState(null, '', location.pathname + '?tur=' + encodeURIComponent(id) + '#plan'); } catch(_){} render(); window.scrollTo({top:0}); return; }
+  location.href = location.pathname + '?tur=' + encodeURIComponent(id) + '#plan';
+}
+function tripRange(t){
+  if (!isoDate(t.start) || !isoDate(t.end)) return '';
+  const a = D(t.start), b = D(t.end);
+  return a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear()
+    ? a.getUTCDate() + '.–' + b.getUTCDate() + '. ' + MONL[b.getUTCMonth()] + ' ' + b.getUTCFullYear()
+    : a.getUTCDate() + '. ' + MON[a.getUTCMonth()] + ' – ' + b.getUTCDate() + '. ' + MON[b.getUTCMonth()] + ' ' + b.getUTCFullYear();
+}
+function tripPill(t){
+  if (!isoDate(t.start)) return 'dato ikke satt';
+  const now = new Date(); const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12));
+  const diff = Math.round((D(t.start) - today) / 864e5);
+  const left = isoDate(t.end) ? Math.round((D(t.end) - today) / 864e5) : diff;
+  if (diff > 1) return 'om ' + diff + ' dager';
+  if (diff === 1) return 'i morgen!';
+  if (left >= 0) return 'pågår nå';
+  return 'ferdig';
+}
+function isPast(t){
+  if (!isoDate(t.end || t.start)) return false;
+  const now = new Date(); const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12));
+  return D(t.end || t.start) < today;
+}
+function homeView(){
+  const next = S.trips.filter(t => !isPast(t)).sort((a, b) => String(a.start || '9999') < String(b.start || '9999') ? -1 : 1);
+  const past = S.trips.filter(isPast).sort((a, b) => String(a.start) > String(b.start) ? -1 : 1);
+  const list = S.homeTab === 'past' ? past : next;
+  const tab = (id, label) => h('button', {class:'tab', role:'tab', 'aria-selected': String(S.homeTab === id), onclick:() => { S.homeTab = id; render(); }}, label);
+  if (!S.loaded.trips) return [h('p', {class:'muted', style:'margin-top:60px'}, 'Henter turene dine …')];
+  return [
+    h('nav', {class:'tabs', role:'tablist', 'aria-label':'Turer', style:'margin-top:26px'}, tab('next', 'Kommende'), tab('past', 'Tidligere')),
+    h('div', {class:'trips'},
+      list.map(t => {
+        const ids = S.tripMembers[t.id] || [];
+        return h('button', {class:'tripcard' + (t.id === S.tripId ? ' current' : ''), onclick:() => openTrip(t.id)},
+          h('div', {class:'tripcard-top'}, h('span', {class:'eyebrow'}, t.note || 'Tur'), h('span', {class:'countpill' + (tripPill(t) === 'pågår nå' ? ' live' : '')}, tripPill(t))),
+          h('div', {class:'tripcard-title'}, t.title || 'Uten navn'),
+          h('div', {class:'tripcard-foot'}, h('span', null, tripRange(t) || 'Ingen datoer ennå'), ids.length ? h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true))) : null));
+      }),
+      S.homeTab === 'next' ? h('button', {class:'addcard tripadd', onclick:() => newTripSheet()}, h('b', null, '+'), 'Ny tur') : null,
+      !list.length && S.homeTab === 'past' ? h('p', {class:'muted'}, 'Ingen tidligere turer ennå.') : null
+    )
+  ];
+}
+function newTripSheet(){
+  const title = h('input', {class:'input', placeholder:'F.eks. København', maxlength:'40'});
+  const note = h('input', {class:'input', placeholder:'F.eks. Jentetur', maxlength:'60'});
+  const start = h('input', {class:'input', type:'date'});
+  const end = h('input', {class:'input', type:'date'});
+  const btn = h('button', {class:'btn primary', type:'submit'}, 'Lag turen');
+  const form = h('form', {class:'form', onsubmit: async e => {
+    e.preventDefault();
+    if (!title.value.trim()) return title.focus();
+    if (start.value && end.value && end.value < start.value){ toast('Hjemreisen må være etter avreisen.'); return end.focus(); }
+    btn.disabled = true; btn.textContent = 'Lager turen …';
+    const { data, error } = await window.yaffleRpc('create_trip', {p_title:title.value.trim(), p_note:note.value.trim(), p_start:start.value, p_end:end.value});
+    if (error || !data){ btn.disabled = false; btn.textContent = 'Lag turen'; toast('Fikk ikke laget turen. Prøv igjen.'); return; }
+    openTrip(data);
+  }},
+    field('Hvor skal dere?', 'n-title', title), field('Hva slags tur', 'n-note', note),
+    h('div', {class:'row2'}, field('Avreise', 'n-start', start), field('Hjemreise', 'n-end', end)),
+    h('p', {class:'muted', style:'margin:0;font-size:14px'}, 'Når turen er laget, kan du invitere gjengen med en lenke.'),
+    h('div', {class:'actions'}, h('span'), btn));
+  openSheet(h('h2', null, 'Ny tur'), form);
+}
+async function inviteSheet(reset){
+  openSheet(h('h2', null, 'Inviter flere'), h('p', {class:'muted'}, 'Lager lenke …'));
+  const { data: code, error } = await window.yaffleRpc(reset ? 'reset_invite' : 'create_invite', {p_trip:S.tripId});
+  if (error || !code){ openSheet(h('h2', null, 'Inviter flere'), h('p', null, 'Fikk ikke laget en lenke. Prøv igjen.')); return; }
+  const url = location.origin + location.pathname + '?bli-med=' + code;
+  const inp = h('input', {class:'input', id:'invite-url', readonly:true, value:url, onfocus: e => e.target.select()});
+  openSheet(h('h2', null, 'Inviter flere'),
+    h('p', null, 'Send lenken til dem som skal være med på ' + (S.trip && S.trip.title || 'turen') + '. De lager en konto og havner rett i turen.'),
+    inp,
+    h('div', {style:'display:flex;flex-wrap:wrap;gap:10px;margin-top:12px'},
+      h('button', {class:'btn primary', onclick: async () => { try { await navigator.clipboard.writeText(url); toast('Lenken er kopiert'); } catch(e){ inp.select(); toast('Merk lenken og kopier den'); } }}, 'Kopier lenke'),
+      navigator.share ? h('button', {class:'btn ghost', onclick: () => navigator.share({title:'Bli med på ' + (S.trip && S.trip.title || 'tur') + ' i Yaffle', url}).catch(() => {})}, 'Del') : null),
+    h('p', {class:'muted', style:'font-size:14px;margin-top:18px'}, 'Alle med lenken kan bli med. Har den kommet på avveie, lag en ny, så slutter den gamle å virke.'),
+    h('button', {class:'linkbtn', onclick:() => inviteSheet(true)}, 'Lag ny lenke'));
+}
+
 /* ---------- onboarding ---------- */
 function onboard(){
   const inp = h('input', {class:'input', id:'nick', placeholder:'Navnet ditt', maxlength:'24', 'aria-label':'Navnet ditt'});
   const save = async e => {
     e.preventDefault();
     const v = inp.value.trim(); if (!v) return inp.focus();
-    await write('members/' + S.me, () => S.db.doc('members/' + S.me).update({nick:v}));
+    await saveProfile({nick:v});
   };
   setTimeout(() => inp.focus(), 50);
   return h('form', {class:'onboard', onsubmit:save},

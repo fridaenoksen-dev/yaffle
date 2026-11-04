@@ -56,35 +56,60 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 /* ---------- login screens ---------- */
-function loginScreen(note) {
-  const email = h("input", { class: "input", id: "login-email", type: "email", autocomplete: "username", placeholder: "navn@epost.no", required: true, "aria-label": "E-post" });
-  const pass = h("input", { class: "input", id: "login-pass", type: "password", autocomplete: "current-password", placeholder: "Passord", required: true, "aria-label": "Passord" });
+// Invitasjonskode fra lenken (?bli-med=KODE) huskes til man er logget inn.
+const INVITE_KEY = "yaffle-invite";
+(() => {
+  const code = new URLSearchParams(location.search).get("bli-med");
+  if (code) { try { sessionStorage.setItem(INVITE_KEY, code); } catch (e) {} }
+})();
+const pendingInvite = () => { try { return sessionStorage.getItem(INVITE_KEY); } catch (e) { return null; } };
+
+function loginScreen(note, mode) {
+  mode = mode || (pendingInvite() ? "signup" : "login");
+  const signup = mode === "signup";
+  const name = h("input", { class: "input", id: "login-name", autocomplete: "given-name", placeholder: "Fornavn", maxlength: "24", "aria-label": "Fornavn" });
+  const email = h("input", { class: "input", id: "login-email", type: "email", autocomplete: signup ? "email" : "username", placeholder: "navn@epost.no", required: true, "aria-label": "E-post" });
+  const pass = h("input", { class: "input", id: "login-pass", type: "password", autocomplete: signup ? "new-password" : "current-password", placeholder: signup ? "Velg et passord (minst 8 tegn)" : "Passord", required: true, "aria-label": "Passord" });
   const show = h("button", { type: "button", class: "linkbtn", style: "font-size:14px;color:var(--muted);align-self:flex-end", onclick: () => {
     const on = pass.type === "password"; pass.type = on ? "text" : "password"; show.textContent = on ? "Skjul passord" : "Vis passord";
   } }, "Vis passord");
-  const btn = h("button", { class: "btn dark", type: "submit" }, "Logg inn");
-  const msg = h("p", { role: "status" }, note || "Logg inn med e-posten og passordet du har fått.");
+  const btn = h("button", { class: "btn dark", type: "submit" }, signup ? "Lag konto" : "Logg inn");
+  const msg = h("p", { role: "status" }, note || (pendingInvite()
+    ? (signup ? "Du er invitert på tur! Lag en konto for å bli med." : "Du er invitert på tur! Logg inn for å bli med.")
+    : (signup ? "Lag en konto med e-post og passord." : "Logg inn med e-post og passord.")));
+  const fail = (text) => { btn.disabled = false; btn.textContent = signup ? "Lag konto" : "Logg inn"; msg.style.color = "var(--red)"; msg.textContent = text; };
   const form = h("form", { class: "onboard", style: "gap:12px", onsubmit: async (e) => {
     e.preventDefault();
     const v = email.value.trim(); if (!v) return email.focus(); if (!pass.value) return pass.focus();
-    btn.disabled = true; btn.textContent = "Logger inn …";
+    if (signup && !name.value.trim()) return name.focus();
+    if (signup && pass.value.length < 8) return fail("Passordet må ha minst 8 tegn.");
+    btn.disabled = true; btn.textContent = signup ? "Lager konto …" : "Logger inn …";
+    if (signup) {
+      const { data, error } = await sb.auth.signUp({ email: v, password: pass.value });
+      if (error) return fail(/registered|exists/i.test(error.message) ? "Det finnes allerede en konto med denne e-posten. Logg inn i stedet."
+        : /password/i.test(error.message) ? "Passordet er for svakt. Prøv et lengre." : /rate|limit/i.test(error.message) ? "For mange forsøk. Vent litt og prøv igjen." : "Fikk ikke laget kontoen. Prøv igjen.");
+      try { sessionStorage.setItem("yaffle-nick", name.value.trim()); } catch (e) {}
+      if (data && data.session) return start(data.session);
+      form.replaceChildren(h("h2", null, "Sjekk e-posten din"), h("p", null, "Trykk på lenken i e-posten for å bekrefte kontoen, og logg så inn."),
+        h("button", { class: "btn ghost", type: "button", onclick: () => loginScreen(null, "login") }, "Til innlogging"));
+      return;
+    }
     const { data, error } = await sb.auth.signInWithPassword({ email: v, password: pass.value });
     if (error) {
-      btn.disabled = false; btn.textContent = "Logg inn";
-      msg.style.color = "var(--red)";
-      msg.textContent = /invalid login credentials/i.test(error.message) ? "Feil e-post eller passord. Prøv igjen."
-        : /not confirmed/i.test(error.message) ? "Brukeren er ikke bekreftet ennå. Be den som administrerer turen huke av for «Auto Confirm User»."
-        : /rate|limit|too many/i.test(error.message) ? "For mange forsøk. Vent et par minutter og prøv igjen."
-        : "Fikk ikke logget inn. Sjekk nettet og prøv igjen.";
       pass.select();
-      return;
+      return fail(/invalid login credentials/i.test(error.message) ? "Feil e-post eller passord. Prøv igjen."
+        : /not confirmed/i.test(error.message) ? "Kontoen er ikke bekreftet ennå. Sjekk e-posten din."
+        : /rate|limit|too many/i.test(error.message) ? "For mange forsøk. Vent et par minutter og prøv igjen."
+        : "Fikk ikke logget inn. Sjekk nettet og prøv igjen.");
     }
     if (data && data.session) start(data.session);
   } },
-    h("h2", { style: "margin-bottom:6px" }, "Logg inn"), msg, email, pass, show, btn,
-    h("p", { style: "font-size:14px;margin-top:8px" }, "Glemt passordet? Be den som administrerer turen om å sette et nytt."));
+    h("h2", { style: "margin-bottom:6px" }, signup ? "Lag konto" : "Logg inn"), msg,
+    signup ? name : null, email, pass, show, btn,
+    h("button", { type: "button", class: "linkbtn", style: "margin-top:12px;align-self:flex-start", onclick: () => loginScreen(null, signup ? "login" : "signup") },
+      signup ? "Har du konto? Logg inn" : "Ny her? Lag konto"));
   app.replaceChildren(brand(), form);
-  setTimeout(() => email.focus(), 50);
+  setTimeout(() => (signup ? name : email).focus(), 50);
 }
 
 // Lar hver person bytte fra passordet de fikk til sitt eget.
@@ -401,7 +426,7 @@ const assets = {
       "image/gif": "gif",
       "application/pdf": "pdf",
     }[type];
-    const id = crypto.randomUUID() + "." + ext;
+    const id = (opts.folder ? String(opts.folder).replace(/[^a-zA-Z0-9_\/-]/g, '') + "/" : "") + crypto.randomUUID() + "." + ext;
     const { error } = await sb.storage
       .from(BUCKET)
       .upload(id, file, { contentType: type, upsert: false });
@@ -495,6 +520,7 @@ function makeUser(session) {
 
 /* ---------- boot ---------- */
 let started = false;
+let alert_msg = null;
 async function start(session) {
   if (started) return;
   started = true;
@@ -502,23 +528,23 @@ async function start(session) {
     brand(),
     h("p", { class: "muted", style: "margin-top:60px" }, "Henter turen …"),
   );
-  const { data: member, error } = await sb.rpc("is_member");
-  if (error) {
-    app.replaceChildren(
-      brand(),
-      h(
-        "div",
-        { class: "notice", style: "margin-top:40px" },
-        "Får ikke kontakt med databasen. Sjekk at schema.sql er kjørt i Supabase.",
-      ),
-    );
-    return;
+  // Godta invitasjon fra lenken
+  const code = pendingInvite();
+  if (code) {
+    const { data: tid, error } = await sb.rpc("accept_invite", { p_code: code });
+    try { sessionStorage.removeItem(INVITE_KEY); } catch (e) {}
+    if (error) {
+      app.replaceChildren(brand(), h("div", { class: "notice", style: "margin-top:40px" }, "Får ikke kontakt med databasen. Sjekk at migrate-flere-turer.sql er kjørt i Supabase."));
+      return;
+    }
+    if (tid) { try { localStorage.setItem("yaffle-trip", tid); } catch (e) {} history.replaceState(null, "", location.pathname + "?tur=" + encodeURIComponent(tid) + "#plan"); }
+    else { history.replaceState(null, "", location.pathname); alert_msg = "Invitasjonslenken virker ikke lenger. Be om en ny."; }
   }
-  if (!member) {
-    started = false;
-    noAccessScreen(session.user.email);
-    return;
-  }
+  // Navn fra registreringen
+  let nick = null; try { nick = sessionStorage.getItem("yaffle-nick"); sessionStorage.removeItem("yaffle-nick"); } catch (e) {}
+  if (nick) { await sb.from("docs").upsert({ path: "profiles/" + session.user.id, collection: "profiles", data: { nick } }); }
+  window.yaffleRpc = (name, args) => sb.rpc(name, args);
+  window.yaffleNotice = alert_msg;
   loaded = loadAll();
   try {
     await loaded;
