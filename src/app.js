@@ -496,7 +496,7 @@ function planView(){
       weatherLine(day),
       h('div', {class:'stack', style:'flex:1;align-content:start'},
         sleeping.map(s => h('div', {class:'sleep'}, h('span', {class:'tile stay', style:'width:24px;height:24px;border-radius:8px', svg:ICONS.stay}), 'Dere bor på ', h('b', {style:'color:var(--ink)'}, s.title))),
-        entries.map(e => e.type === 'item' ? itemCard(e.x) : plannedIdeaCard(e.x)),
+        groupTravel(entries).map(e => e.type === 'travel' ? travelBlock(e.items) : e.type === 'item' ? itemCard(e.x) : plannedIdeaCard(e.x)),
         entries.length === 0 ? h('p', {class:'muted', style:'margin:4px'}, 'Fri dag så langt. Flytt en idé hit fra tavla.') : null
       ),
       S.canWrite ? h('button', {class:'addcard', style:'margin-top:10px', onclick:() => itemSheet(null, day)}, h('b', null, '+'), 'Legg til') : null
@@ -565,6 +565,52 @@ function itemCard(i){
       S.assets && S.canWrite ? h('label', {class:'attach'}, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), atts.length ? 'Legg ved mer' : 'Legg ved kvittering', input) : null
     ) : null
   );
+}
+
+
+/* ---------- samlet reisevei ---------- */
+const TRAVEL = ['car', 'parking', 'flight', 'taxi'];
+// Slår sammen transport som kommer etter hverandre på en dag til én blokk (minst to ledd)
+function groupTravel(entries){
+  const out = []; let run = [];
+  const flush = () => { if (run.length >= 2) out.push({type:'travel', items:run.map(e => e.x)}); else out.push(...run); run = []; };
+  for (const e of entries){
+    if (e.type === 'item' && TRAVEL.includes(e.x.kind)) run.push(e); else { flush(); out.push(e); }
+  }
+  flush();
+  return out;
+}
+function minutesOf(t){ const m = /^(\d{1,2}):(\d{2})$/.exec(t || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+function durText(min){ if (min < 60) return min + ' min'; const hh = Math.floor(min / 60), mm = min % 60; return hh + ' t' + (mm ? ' ' + mm + ' min' : ''); }
+function travelBlock(items){
+  const first = items.find(i => i.time), last = items.slice().reverse().find(i => i.time);
+  const span = first && last && first !== last ? first.time + '–' + last.time : first ? 'fra ' + first.time : '';
+  const rows = [];
+  items.forEach((i, k) => {
+    if (k > 0){
+      const a = minutesOf(items[k - 1].time), b = minutesOf(i.time);
+      const gap = a != null && b != null && b > a ? durText(b - a) : '';
+      rows.push(h('div', {class:'tv-gap', 'aria-hidden': gap ? null : 'true'}, h('span', {class:'tv-dash'}), gap ? h('span', {class:'tv-gaptext'}, gap + ' senere') : null));
+    }
+    const kind = i.kind || 'other';
+    const status = i.booked === 'no' ? ['todo', 'Må bookes'] : i.pay === 'unpaid' ? ['todo', 'Ikke betalt'] : i.pay === 'unknown' ? ['unknown', 'Betalt?'] : null;
+    const atts = (i.attachments || []).length;
+    const firstLine = String(i.details || '').split('\n')[0];
+    rows.push(h('button', {class:'tv-row', type:'button', onclick:() => S.canWrite ? itemSheet(i) : null, 'aria-label': (i.time ? i.time + ', ' : '') + (i.title || '') + (S.canWrite ? '. Trykk for å endre' : '')},
+      h('span', {class:'tv-time'}, i.time || ''),
+      h('span', {class:'tv-node tile ' + kind, svg: ICONS[kind] || ICONS.other, 'aria-hidden':'true'}),
+      h('span', {class:'tv-body'},
+        h('b', null, i.title || KIND_LABEL[kind]),
+        firstLine ? h('small', null, firstLine) : null,
+        (status || atts || i.ref) ? h('span', {class:'tv-meta'},
+          status ? h('span', {class:'pill ' + status[0]}, h('span', {class:'dot'}), status[1]) : null,
+          i.ref ? h('span', {class:'tv-ref'}, i.ref) : null,
+          atts ? h('span', {class:'tv-att'}, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), atts) : null) : null)
+    ));
+  });
+  return h('section', {class:'travel', 'aria-label':'Reisevei'},
+    h('div', {class:'tv-head'}, h('span', null, 'Reisevei'), span ? h('span', {class:'muted'}, span) : null),
+    rows);
 }
 
 function plannedIdeaCard(i){
