@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261104t";
+import * as CONFIG from "./config.js?v=20261104u";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
@@ -50,8 +50,11 @@ const brand = () =>
     h(
       "div",
       { class: "brand" },
-      (() => { const m = document.createElement("span"); m.className = "brandmark"; m.setAttribute("aria-hidden", "true"); m.innerHTML = window.yaffleLogo.svg(); return m; })(), h("b", null, "Yaffle"),
-      h("i", null, "Yay, waffles."),
+      (() => {
+        if (window.yaffleLogo.inline()) { const im = document.createElement("img"); im.className = "brandlock"; im.src = window.yaffleLogo.lockup(); im.alt = "Yay, waffles"; return im; }
+        const m = document.createElement("span"); m.className = "brandmark"; m.setAttribute("aria-hidden", "true"); m.innerHTML = window.yaffleLogo.svg();
+        const b = document.createElement("b"); b.textContent = "Yaffle"; const w = document.createElement("span"); w.style.display = "contents"; w.append(m, b); return w;
+      })(),
     ),
   );
 
@@ -595,7 +598,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261104t");
+  await import("./app.js?v=20261104u");
 }
 
 const {

@@ -553,6 +553,10 @@ dialog.taxi .close{background:#0e0f0c;color:#fff}
 .brand{align-items:center;gap:10px}
 .brand b{font-family:var(--body);font-weight:600;font-size:18px;letter-spacing:-.02em}
 .brand i{font-size:13px}
+.brandlock{display:block;height:38px;width:auto;--foot-soft:#9db8a9}
+.brandlock svg{display:block;height:38px;width:auto}
+:root[data-theme="dark"] .brandlock{--foot-soft:#4f7d68}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .brandlock{--foot-soft:#4f7d68}}
 .brandmark{width:30px;height:30px;display:block;color:var(--accent);flex:none}
 .brandmark svg{width:100%;height:100%;display:block;fill:currentColor;stroke:none}
 .top{background:var(--paper);border-radius:22px;padding:8px 10px 8px 12px;box-shadow:var(--glow);margin-top:4px}
@@ -724,6 +728,6 @@ dialog.sheet{border-radius:30px 30px 0 0}
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261104t"></script>
+<script type="module" src="./src/runtime.js?v=20261104u"></script>
 </body>
 </html>

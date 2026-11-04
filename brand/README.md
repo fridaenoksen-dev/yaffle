@@ -43,14 +43,14 @@ Varemerke er ikke sjekket. Gjør et søk før logoen brukes kommersielt.
 
 I appen: trykk på profilbildet ditt → **Logo (test)** → Veiskille. Valget lagres bare på enheten din og bytter logoen i toppen og ikonet i nettleserfanen. Ikonet på hjemskjermen følger manifestet og forblir Vaffelplan.
 
-## «Yay, waffle»: forkortelsen bak navnet
+## «Yay, waffles»: forkortelsen bak navnet
 
-Yaffle er en forkortelse av «Yay, waffle». Hovedlockupen i footeren viser det: **Y** og **affle** står i skoggrønn, og **ay, w** i lys salvie (`#9db8a9`, i mørk modus `#4f7d68`).
+Yaffle er en forkortelse av «Yay, waffles». Logoen i toppen og footeren viser det: **Y** og **affle** står i skoggrønn, og **ay, w** og **s** i lys salvie (`#9db8a9`, i mørk modus `#4f7d68`).
 
 | Fil (`brand/yay-waffle/`) | Bruk |
 |---|---|
 | `yay-waffle-forkortelse-green.svg` | Hovedversjon, forkortelsen synlig |
 | `yay-waffle-forkortelse-dark.svg` | Samme på mørk bakgrunn |
 | `yay-waffle-horizontal-green.svg` | Én farge, under ca. 120 px bredde |
-| `yay-waffle-tolinjer-green.svg` | Kompakt, «Yay,» over «waffle» |
+| `yay-waffle-tolinjer-green.svg` | Kompakt, «Yay,» over «waffles» |
 | `yay-waffle-stacked-green.svg` | Ikon over tekst |

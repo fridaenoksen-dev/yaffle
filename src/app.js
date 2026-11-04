@@ -267,7 +267,7 @@ function footer(){
   let mark;
   if (!L || L.inline()){
     // «Yay, waffle» med Y og affle uthevet: inline så fargene følger lys/mørk modus
-    mark = h('span', {class:'foot-logo inline', role:'img', 'aria-label':'Yay, waffle (Yaffle)'});
+    mark = h('span', {class:'foot-logo inline', role:'img', 'aria-label':'Yay, waffles (Yaffle)'});
     footSvg(logo).then(svg => { if (svg) mark.innerHTML = svg; });
   } else mark = h('span', {class:'foot-logo', role:'img', 'aria-label':'Yaffle', style:"--logo:url('" + logo + "')"});
   return h('footer', {class:'foot'},
@@ -306,9 +306,17 @@ function view(){
   return out;
 }
 
+// Toppen: hele «Yay, waffles»-logoen. Med Veiskille vises symbolet og navnet som før.
+function brandLockup(){
+  const L = window.yaffleLogo;
+  if (L && !L.inline()) return [h('span', {class:'brandmark', 'aria-hidden':'true', svg: L.svg()}), h('b', null, 'Yaffle')];
+  const el = h('span', {class:'brandlock', 'aria-hidden':'true'});
+  footSvg(L ? L.lockup() : '/brand/yay-waffle/yay-waffle-forkortelse-green.svg').then(svg => { if (svg) el.innerHTML = svg; });
+  return el;
+}
 function topBar(){
   return h('div', {class:'top'},
-    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); goHome(); }}, h('span', {class:'brandmark', 'aria-hidden':'true', svg: window.yaffleLogo ? window.yaffleLogo.svg() : ''}), h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
+    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); goHome(); }}, brandLockup()),
     S.me ? h('button', {class:'mebtn', 'aria-label':'Din profil', onclick:() => meSheet()}, face(S.me)) : null
   );
 }
