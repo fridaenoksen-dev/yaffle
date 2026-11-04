@@ -670,7 +670,7 @@ function folderRow(folders){
   const count = id => S.ideas.filter(i => id ? i.folder === id : true).length;
   const chip = (id, label) => h('button', {class:'folder-chip', 'aria-pressed': String((S.folder || null) === id), onclick:() => { S.folder = id; mapFitted = false; render(); }},
     label, h('small', null, count(id)));
-  if (!folders.length) return S.canWrite ? h('div', {class:'folder-row'}, h('button', {class:'folder-chip add', onclick:() => foldersSheet()}, '+ Del inn i steder')) : null;
+  if (!folders.length) return null;
   return h('div', {class:'folder-row', role:'group', 'aria-label':'Steder'},
     chip(null, 'Alle steder'),
     folders.map(f => chip(f.id, f.name)),
@@ -733,7 +733,10 @@ function boardView(){
     h('p', null, S.folder ? 'Ingen idéer for ' + folderName(S.folder) + ' ennå. Trykk + for å feste den første.' : S.ideas.length ? 'Prøv et annet filter.' : 'Trykk + for å feste det første forslaget, for eksempel en kafé eller en dagstur.'));
 
   const mode = (id, label) => h('button', {'aria-pressed': String(S.boardMode === id), onclick:() => { S.boardMode = id; render(); }}, label);
-  const bar = h('div', {class:'boardbar'}, h('div', {class:'seg', role:'group', 'aria-label':'Visning'}, mode('tavle','Tavle'), mode('kart','Kart')), h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('planned','Planlagt')));
+  const bar = h('div', {class:'boardbar'},
+    h('div', {class:'boardrow'}, h('div', {class:'seg', role:'group', 'aria-label':'Visning'}, mode('tavle','Tavle'), mode('kart','Kart')),
+      S.canWrite && !folders.length ? h('button', {class:'folder-chip add bar-add', onclick:() => foldersSheet()}, '+ Del inn i steder') : null),
+    h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('planned','Planlagt')));
   const frow = folderRow(folders);
   if (S.boardMode === 'kart') return [frow, bar, ...mapView(list)];
   return [frow, bar, drops, grid];

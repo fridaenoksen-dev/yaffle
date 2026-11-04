@@ -243,6 +243,8 @@ button{cursor:pointer}
 .folder-chip small{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
 .folder-chip[aria-pressed="true"]{background:#000;color:#fff;box-shadow:none}
 .folder-chip[aria-pressed="true"] small{color:rgba(255,255,255,.7)}
+.boardrow{display:flex;align-items:center;gap:8px;flex:1 1 100%}
+.bar-add{margin-left:auto;padding:7px 12px;font-size:13px}
 .folder-chip.add{background:none;box-shadow:inset 0 0 0 1.5px var(--fog-2);color:var(--muted)}
 .pin-folder{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)!important}
 /* bildenåler på kartet */
@@ -571,6 +573,9 @@ dialog.taxi .close{background:#0e0f0c;color:#fff}
 .hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .hero.has-cover::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(0,0,0,.15) 0%,rgba(0,0,0,.05) 35%,rgba(0,0,0,.6) 100%);pointer-events:none}
 .hero.has-cover::after{display:none}
+.hero.has-cover .hd-range{background:rgba(14,15,12,.55);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);color:#fff;padding:7px 14px;border-radius:50px}
+.hero.has-cover .hd-nights{background:rgba(14,15,12,.55)!important;color:#fff!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.hero.has-cover .hd-sep{background:rgba(255,255,255,.8)}
 .hero.has-cover h1{text-shadow:0 2px 18px rgba(0,0,0,.35)}
 .hero .sub{color:rgba(255,255,255,.92);font-size:15px;position:relative;z-index:1}
 .hero .countpill{background:#fff;color:#000;font-weight:600;box-shadow:inset 0 1px 0 #fff,0 0 0 1px rgba(0,0,0,.08),0 3px 2px rgba(0,0,0,.06)}
@@ -652,6 +657,6 @@ dialog.sheet{border-radius:30px 30px 0 0}
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261104k"></script>
+<script type="module" src="./src/runtime.js?v=20261104l"></script>
 </body>
 </html>
