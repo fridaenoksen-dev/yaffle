@@ -355,16 +355,29 @@ function hero(){
   }
   const cd = countdown();
   const ids = memberIds();
+  const nights = Math.max(0, days.length - 1);
   return h('header', {class:'hero'},
-    h('div', {class:'hero-title'},
-      h('h1', null, t.title || 'Turen'),
+    h('h1', null, t.title || 'Turen'),
+    heroDates(days),
+    h('div', {class:'hero-row'},
       h('span', {class:'countpill' + (cd.live ? ' live' : '')}, cd.pill),
-      cd.daysTo != null && cd.daysTo <= 5 && cd.daysTo >= 0 && packLeft() ? h('button', {class:'countpill todo', onclick:() => go('pakk')}, packLeft() + ' igjen å pakke') : null),
-    h('div', {class:'sub'},
-      h('span', null, [t.note, range].filter(Boolean).join(' · ')),
+      nights > 0 ? h('span', {class:'hd-nights'}, nights + (nights === 1 ? ' natt' : ' netter')) : null,
+      cd.daysTo != null && cd.daysTo <= 5 && cd.daysTo >= 0 && packLeft() ? h('button', {class:'countpill todo', onclick:() => go('pakk')}, packLeft() + ' igjen å pakke') : null,
       ids.length ? h('button', {class:'stack-btn', 'aria-label':'Se gjengen', onclick:() => crewSheet()},
         h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true)))) : null)
   );
+}
+
+// Datoene under turnavnet: TOR 19. — SØN 22. NOVEMBER
+function heroDates(days){
+  if (!days.length) return h('span', {class:'hero-dates'}, 'Datoer ikke satt');
+  const a = D(days[0]), b = D(days[days.length - 1]);
+  const wd = d => WD[d.getUTCDay()].slice(0, 3);
+  const sameMonth = a.getUTCMonth() === b.getUTCMonth();
+  const left = wd(a) + ' ' + a.getUTCDate() + '.' + (sameMonth ? '' : ' ' + MONL[a.getUTCMonth()]);
+  const right = wd(b) + ' ' + b.getUTCDate() + '. ' + MONL[b.getUTCMonth()];
+  return h('div', {class:'hero-dates'},
+    h('span', {class:'hd-range'}, days.length > 1 ? [left, h('span', {class:'hd-sep', 'aria-hidden':'true'}), right] : right));
 }
 
 function crewSheet(){
