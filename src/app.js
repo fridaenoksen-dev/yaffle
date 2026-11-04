@@ -577,7 +577,7 @@ function plannedIdeaCard(i){
       safeUrl(i.link) ? h('div', {class:'meta'}, h('a', {href:safeUrl(i.link), target:'_blank', rel:'noopener', style:'color:var(--ink)'}, 'Åpne lenke')) : null
     ),
     S.canWrite ? h('button', {class:'iconbtn edit', onclick:() => ideaSheet(i)}, 'Endre') : h('span'),
-    h('div', {class:'pills'}, heartBtn(i), S.canWrite ? h('button', {class:'pill neutral', onclick:() => moveIdea(i, null)}, 'Tilbake til tavla') : null)
+    S.canWrite ? h('div', {class:'pills'}, S.canWrite ? h('button', {class:'pill neutral', onclick:() => moveIdea(i, null)}, 'Tilbake til tavla') : null) : null
   );
 }
 
