@@ -72,7 +72,7 @@ function dayLabel(iso, short){
   return short ? cap(w.slice(0,3)) + ' ' + d.getUTCDate() + '.' : cap(w) + ' ' + d.getUTCDate() + '. ' + MON[d.getUTCMonth()];
 }
 function money(n, cur){ return nf.format(n) + ' ' + (CUR[cur] || cur || 'kr'); }
-const PALETTE = ['#1c1c1e','#3a3a3c','#007aff','#5856d6','#636366','#0060df'];
+const PALETTE = ['#1c1c1e','#3a3a3c','#1e5a46','#5f8f6e','#636366','#8a6d3b'];
 function hashColor(s){ let x=0; for (const c of String(s)) x = (x*31 + c.charCodeAt(0)) | 0; return PALETTE[Math.abs(x) % PALETTE.length]; }
 
 const sheet = document.getElementById('sheet');
@@ -81,7 +81,7 @@ const sheetBody = document.getElementById('sheetBody');
 const S = {
   db:null, user:null, assets:null, me:null, canWrite:true,
   trip:null, items:[], ideas:[], members:{}, profiles:{},
-  packing:[], personal:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
+  packing:[], personal:{}, prep:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
   view: (h => h === 'papirer' ? 'penger' : ['plan','ideer','pakk','penger','hjem'].includes(h) ? h : 'plan')(location.hash.slice(1)),
   tripId: null, trips:[], profileDocs:{}, memberDocs:{}, tripMembers:{}, homeTab:'next',
   filter:'all', boardMode:'tavle', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
@@ -191,6 +191,7 @@ render();
   }, onErr('ideas'));
   S.db.collection('packing').onSnapshot(s => { S.packing = s.docs.map(d => ({id:d.id, ...d.data()})); render(); }, () => {});
   S.db.collection('personal').onSnapshot(s => { S.personal = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); render(); }, () => {});
+  S.db.collection('prep').onSnapshot(s => { S.prep = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); render(); }, () => {});
   S.db.collection('members').onSnapshot(s => {
     S.memberDocs = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
     mergeMembers(); done('members', s); refreshProfiles(); render();
@@ -522,7 +523,113 @@ function planView(){
   const chips = h('div', {class:'daychips-row', role:'group', 'aria-label':'Gå til dag'},
     days.map((d, idx) => h('button', {class: d === todayIso ? 'today' : null, onclick:() => jump(idx)}, dayLabel(d, true))));
   if (!S.jumpedToday && days.includes(todayIso)){ S.jumpedToday = true; setTimeout(() => jump(days.indexOf(todayIso)), 60); }
-  return [days.length > 1 ? chips : null, scroller];
+  return [prepCard(), days.length > 1 ? chips : null, scroller];
+}
+
+/* ---------- før dere reiser: apper og ting å ordne ---------- */
+// Steder vi vet hvilke apper som brukes. Sjekket nov. 2026.
+const PLACE_TIPS = [
+  {match:/gda[nń]sk|sopot|gdynia|tr[oó]jmiasto|warszawa|warsaw|krak[oó]w|wroc[lł]aw|pozna[nń]|polen|poland/i, country:'Polen', tips:[
+    {key:'ride-pl', title:'Bolt eller Uber', note:'Begge kjører i Gdańsk og Sopot, og Bolt er ofte billigst. FreeNow bestiller vanlige taxier. Legg inn betalingskort før dere drar.', group:'Apper'},
+    {key:'transit-pl', title:'Jakdojade', note:'Rutetider og billetter for buss, trikk og SKM-toget mellom Gdańsk og Sopot, på engelsk.', group:'Apper'},
+    {key:'money-pl', title:'Betal i zloty', note:'Polen bruker zloty (PLN). Kort fungerer nesten overalt. Velg å betale i PLN, ikke NOK, når terminalen spør, så slipper dere dårlig kurs.', group:'Ordne'}
+  ]}
+];
+const AIRLINES = [
+  ['Ryanair', /ryanair|\bFR\d{2,4}\b/i], ['Norwegian', /norwegian|\bDY\d{2,4}\b/i], ['SAS', /\bSAS\b|\bSK\d{2,4}\b/], ['Widerøe', /wider[oø]e|\bWF\d{2,4}\b/i],
+  ['Wizz Air', /wizz|\bW6\d{2,4}\b/i], ['easyJet', /easyjet|\bU2\d{2,4}\b/i], ['KLM', /\bKLM\b|\bKL\d{2,4}\b/], ['Lufthansa', /lufthansa|\bLH\d{2,4}\b/i]
+];
+function prepList(){
+  const out = [];
+  const flights = S.items.filter(i => i.kind === 'flight');
+  const seen = new Set();
+  for (const f of flights){
+    const txt = (f.title || '') + ' ' + (f.details || '');
+    for (const [name, re] of AIRLINES){
+      if (!re.test(txt) || seen.has(name)) continue;
+      seen.add(name);
+      const reserved = flights.some(x => /sete|seat/i.test(x.details || ''));
+      if (name === 'Ryanair'){
+        out.push({key:'app-ryanair', title:'Ryanair-appen', note:'Boardingkortet finnes bare i appen. Utskrift og PDF godtas ikke.', group:'Apper'});
+        out.push({key:'checkin-ryanair', title:'Sjekk inn hos Ryanair', note: reserved
+          ? 'Dere har kjøpt seter, så innsjekk er åpen fra 60 dager før. Den stenger 2 timer før avgang, og etter det koster det penger på flyplassen.'
+          : 'Uten kjøpt sete åpner innsjekk 24 timer før avgang og stenger 2 timer før. Etter det koster det penger på flyplassen.', group:'Ordne'});
+      } else {
+        out.push({key:'app-' + name.toLowerCase().replace(/\W/g,''), title: name + '-appen', note:'Ha boardingkortet i appen, og sjekk inn så snart det åpner.', group:'Apper'});
+      }
+    }
+  }
+  const where = [(S.trip && S.trip.title) || '', ...tripFolders().map(f => f.name), ...S.items.filter(i => i.kind === 'stay').map(i => (i.title || '') + ' ' + (i.place || ''))].join(' ');
+  for (const p of PLACE_TIPS) if (p.match.test(where)) out.push(...p.tips);
+  out.push({key:'maps-offline', title:'Kart uten nett', note:'Last ned området i Google Maps eller Apple Maps, så finner dere fram selv uten dekning.', group:'Apper'});
+  out.push({key:'id', title:'Pass eller nasjonalt ID-kort', note:'Sjekk at det ikke går ut før dere er hjemme igjen.', group:'Ordne'});
+  out.push({key:'ehic', title:'Europeisk helsetrygdkort', note:'Gratis på helsenorge.no. Gir rett til nødvendig helsehjelp i EU/EØS.', group:'Ordne'});
+  out.push({key:'insurance', title:'Reiseforsikring', note:'Sjekk at den gjelder, ofte via bank eller kredittkort.', group:'Ordne'});
+  const hidden = new Set((S.trip && S.trip.prepHidden) || []);
+  const extra = ((S.trip && S.trip.prepExtra) || []).map(x => ({key:'x-' + x.id, title:x.text, note:'', group:'Egne', own:true, id:x.id}));
+  return [...out.filter(t => !hidden.has(t.key)), ...extra];
+}
+function prepDone(uid, key){ const d = S.prep[uid] && S.prep[uid].done; return !!(d && d[key]); }
+async function togglePrep(key){
+  if (!S.me) return;
+  const on = !prepDone(S.me, key);
+  const path = 'prep/' + S.me;
+  await write(path, () => S.prep[S.me] ? S.db.doc(path).update({done:{[key]: on ? Date.now() : null}}) : S.db.doc(path).set({done:{[key]: Date.now()}}));
+}
+function prepCard(){
+  const days = tripDays();
+  if (!days.length || !S.me) return null;
+  const now = new Date(); const today = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  if (today > days[0]) return null;
+  const list = prepList(); if (!list.length) return null;
+  const mine = list.filter(t => prepDone(S.me, t.key)).length;
+  const all = mine === list.length;
+  return h('button', {class:'prepcard' + (all ? ' done' : ''), onclick:() => prepSheet()},
+    h('span', {class:'prepcard-ring', style:'--p:' + Math.round(mine / list.length * 100)}, h('b', null, mine), h('small', null, '/' + list.length)),
+    h('span', {class:'prepcard-txt'}, h('b', null, all ? 'Du er klar til å reise' : 'Før dere reiser'),
+      h('span', null, all ? 'Alt på sjekklisten er huket av.' : 'Apper å laste ned og ting å ordne')),
+    h('span', {class:'prepcard-go', 'aria-hidden':'true'}, '›'));
+}
+function prepSheet(){
+  const draw = () => {
+    const list = prepList();
+    const ids = memberIds();
+    const groups = ['Apper', 'Ordne', 'Egne'].map(g => [g, list.filter(t => t.group === g)]).filter(([, l]) => l.length);
+    const row = t => {
+      const done = prepDone(S.me, t.key);
+      const who = ids.filter(id => prepDone(id, t.key));
+      let armed = false;
+      const rm = S.canWrite ? h('button', {class:'check-del', type:'button', 'aria-label':'Fjern ' + t.title + ' fra listen', onclick: async e => {
+        e.stopPropagation();
+        if (!armed){ armed = true; rm.textContent = 'Fjern?'; rm.classList.add('armed'); setTimeout(() => { armed = false; rm.textContent = '×'; rm.classList.remove('armed'); }, 3000); return; }
+        const tr = S.trip || {};
+        const patch = t.own ? {prepExtra: (tr.prepExtra || []).filter(x => x.id !== t.id)} : {prepHidden: [...new Set([...(tr.prepHidden || []), t.key])]};
+        await write('trip/main', () => S.db.doc('trip/main').update(patch)); draw();
+      }}, '×') : null;
+      return h('div', {class:'prep-row' + (done ? ' on' : '')},
+        h('button', {class:'prep-check', role:'checkbox', 'aria-checked': String(done), 'aria-label': t.title, onclick: async () => { await togglePrep(t.key); draw(); }}, done ? '✓' : ''),
+        h('div', {class:'prep-body'}, h('b', null, t.title), t.note ? h('p', null, t.note) : null,
+          ids.length > 1 ? h('div', {class:'prep-who'}, who.length ? h('span', {class:'faces'}, who.map(id => face(id, true))) : null, h('small', null, !who.length ? 'Ingen har huket av ennå' : who.length === ids.length ? 'Alle har ordnet det' : who.map(nameOf).join(', '))) : null),
+        rm);
+    };
+    const inp = h('input', {class:'input', placeholder:'Legg til eget punkt', maxlength:'80', 'aria-label':'Nytt punkt'});
+    const add = async () => {
+      const v = inp.value.trim(); if (!v) return inp.focus();
+      const tr = S.trip || {};
+      await write('trip/main', () => S.db.doc('trip/main').update({prepExtra: [...(tr.prepExtra || []), {id: Date.now().toString(36), text:v}]})); draw();
+    };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
+    body.replaceChildren(...[
+      h('p', {class:'muted', style:'margin:0 0 4px'}, 'Hver av dere huker av sin egen liste, så dere ser hvem som er klar. Forslagene bygger på bookingene og hvor dere skal.'),
+      groups.map(([g, l]) => [h('div', {class:'section-label'}, g === 'Apper' ? 'Last ned' : g === 'Ordne' ? 'Ordne før avreise' : 'Egne punkter'), h('div', {class:'prep-list'}, l.map(row))]).flat(),
+      S.canWrite ? h('div', {class:'quickadd', style:'margin-top:14px'}, inp, h('button', {class:'btn dark', type:'button', onclick:add}, 'Legg til')) : null,
+      S.canWrite && ((S.trip && S.trip.prepHidden) || []).length ? h('button', {class:'linkbtn', type:'button', style:'font-size:13px;margin-top:6px', onclick: async () => { await write('trip/main', () => S.db.doc('trip/main').update({prepHidden: []})); draw(); }}, 'Vis forslag jeg har fjernet') : null
+    ].flat(9).filter(x => x != null && x !== false)
+    );
+  };
+  const body = h('div', {class:'form'});
+  draw();
+  openSheet(h('h2', null, 'Før dere reiser'), body);
 }
 
 function bookedPill(i){
