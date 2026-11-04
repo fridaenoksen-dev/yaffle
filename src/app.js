@@ -873,16 +873,20 @@ function mapView(list){
       const ch = document.createElement('i'); ch.textContent = '›'; el.append(ch); return el; };
     const home = stays[0] ? [Number(stays[0].lat), Number(stays[0].lng)] : null;
     for (const st of stays){
-      const m = L.marker([Number(st.lat), Number(st.lng)], {icon: L.divIcon({className:'', html:'<span class="mk2 mk2-home">' + ICONS.stay + '</span>', iconSize:[30, 30], iconAnchor:[15, 15]}), title:'Her bor dere: ' + st.title, keyboard:true, zIndexOffset:1000});
-      m.bindTooltip(callout('Her bor dere'), {permanent:true, direction:'right', offset:[14, 0], className:'callout callout-home'});
+      const m = L.marker([Number(st.lat), Number(st.lng)], {icon: L.divIcon({className:'', html:'<span class="pinb pinb-home"><span class="pinb-face">' + ICONS.stay + '</span></span>', iconSize:[46, 54], iconAnchor:[23, 52]}), title:'Her bor dere: ' + st.title, keyboard:true, zIndexOffset:1000});
+      m.bindTooltip(callout('Her bor dere'), {permanent:true, direction:'right', offset:[8, -28], className:'callout callout-home'});
       m.on('click', () => itemSheet(st)); mapLayers.marks.addLayer(m); pts.push([Number(st.lat), Number(st.lng)]);
     }
     shown.forEach((i, k) => {
       const [cname, c] = catOf(i.category);
-      const num = dayIdeas ? '<em>' + (k + 1) + '</em>' : '';
-      const html = '<span class="mk2' + (isAllIn(i) ? ' mk2-allin' : '') + '" style="' + catStyle(c) + '">' + num + '<span class="mk2-dot"></span></span>';
-      const m = L.marker([Number(i.lat), Number(i.lng)], {icon: L.divIcon({className:'', html, iconSize:[22, 22], iconAnchor:[11, 11]}), title:i.title + ' (' + cname + ')', keyboard:true, riseOnHover:true});
-      m.bindTooltip(callout(i.title, (dayIdeas && i.time ? i.time + ' · ' : '') + cname), {permanent:true, direction:'right', offset:[12, 0], className:'callout'});
+      // Bildenål: rund miniatyr med hvit kant og liten spiss, eller kategorifarge med ikon uten bilde
+      const img = ideaImage(i);
+      const esc = v => String(v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      const face2 = img ? '<img src="' + esc(img.src) + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">' : '';
+      const num = dayIdeas ? '<em>' + (k + 1) + '</em>' : (isAllIn(i) ? '<em class="heartbadge">♥</em>' : '');
+      const html = '<span class="pinb' + (img ? ' has-img' : '') + '" style="' + catStyle(c) + '"><span class="pinb-face">' + (ICONS[c.icon] || ICONS.other) + face2 + '</span>' + num + '</span>';
+      const m = L.marker([Number(i.lat), Number(i.lng)], {icon: L.divIcon({className:'', html, iconSize:[46, 54], iconAnchor:[23, 52]}), title:i.title + ' (' + cname + ')', keyboard:true, riseOnHover:true});
+      m.bindTooltip(callout(i.title, (dayIdeas && i.time ? i.time + ' · ' : '') + cname), {permanent:true, direction:'right', offset:[8, -28], className:'callout'});
       m.on('click', () => ideaDetail(i.id)); mapLayers.marks.addLayer(m); pts.push([Number(i.lat), Number(i.lng)]);
     });
     // Dagsrute: fra der dere bor, gjennom dagens idéer i tidsrekkefølge
