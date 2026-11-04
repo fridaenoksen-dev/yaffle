@@ -251,13 +251,29 @@ function render(){
   S.flash.clear();
 }
 
+function footSvg(url){
+  const footCache = footSvg.cache || (footSvg.cache = {});
+  if (!footCache[url]) footCache[url] = fetch(url).then(r => r.ok ? r.text() : '').then(t => t
+    .replace(/<\?xml[^>]*>/, '').replace(/<title>[^<]*<\/title>/, '')
+    .replace(/fill="#1e5a46"/g, 'style="fill:var(--accent)"').replace(/fill="#9db8a9"/g, 'style="fill:var(--foot-soft)"')
+    .replace(/\swidth="\d+" height="\d+"/, ' aria-hidden="true"')).catch(() => '');
+  return footCache[url];
+}
+window.addEventListener('yaffle:logo', () => render());
 function footer(){
   if (S.db && !S.loaded.trip) return null;
-  const logo = window.yaffleLogo ? window.yaffleLogo.lockup() : '/brand/yaffle-horizontal-green.svg';
+  const L = window.yaffleLogo;
+  const logo = L ? L.lockup() : '/brand/yay-waffle/yay-waffle-forkortelse-green.svg';
+  let mark;
+  if (!L || L.inline()){
+    // «Yay, waffle» med Y og affle uthevet: inline så fargene følger lys/mørk modus
+    mark = h('span', {class:'foot-logo inline', role:'img', 'aria-label':'Yay, waffle (Yaffle)'});
+    footSvg(logo).then(svg => { if (svg) mark.innerHTML = svg; });
+  } else mark = h('span', {class:'foot-logo', role:'img', 'aria-label':'Yaffle', style:"--logo:url('" + logo + "')"});
   return h('footer', {class:'foot'},
-    h('span', {class:'foot-logo', role:'img', 'aria-label':'Yaffle', style:"--logo:url('" + logo + "')"}),
+    mark,
     h('p', null, 'Yaffle samler turen på ett sted: plan og bookinger, idéer dere vil gjøre, pakkeliste og hva det koster. Hele gjengen ser det samme, så ingen trenger å lete i chatten.'),
-    h('p', {class:'foot-meta'}, 'Laget for venninnegjengen · Yay, waffles.'));
+    h('p', {class:'foot-meta'}, 'Laget for venninnegjengen'));
 }
 
 function view(){
