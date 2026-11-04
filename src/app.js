@@ -356,7 +356,9 @@ function hero(){
   const cd = countdown();
   const ids = memberIds();
   const nights = Math.max(0, days.length - 1);
-  return h('header', {class:'hero'},
+  const cover = tripCover(t);
+  return h('header', {class:'hero' + (cover ? ' has-cover' : '')},
+    cover ? h('img', {class:'hero-bg', src:cover, alt:'', referrerpolicy:'no-referrer', onerror: e => { e.target.closest('.hero').classList.remove('has-cover'); e.target.remove(); }}) : null,
     h('h1', null, t.title || 'Turen'),
     heroDates(days),
     h('div', {class:'hero-row'},

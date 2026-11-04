@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261104j";
+import * as CONFIG from "./config.js?v=20261104k";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 const app = document.getElementById("app");
@@ -558,7 +558,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261104j");
+  await import("./app.js?v=20261104k");
 }
 
 const {
