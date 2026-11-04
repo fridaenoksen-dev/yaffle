@@ -1200,6 +1200,18 @@ function tripCover(t){
   const w = wikiImage(key);
   return w ? w.src : null;
 }
+// Datoer som to små kalenderblader: 19 NOV → 22 NOV · 3 netter
+function tripDates(t){
+  if (!isoDate(t.start)) return h('span', {class:'datechip empty'}, 'Ingen datoer ennå');
+  const MS = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES'];
+  const leaf = iso => { const d = D(iso); return h('span', {class:'leaf'}, h('b', null, d.getUTCDate()), h('small', null, MS[d.getUTCMonth()])); };
+  const nights = isoDate(t.end) ? Math.round((D(t.end) - D(t.start)) / 864e5) : 0;
+  const year = D(t.start).getUTCFullYear(); const thisYear = new Date().getFullYear();
+  return h('span', {class:'datechip', 'aria-label': tripRange(t)},
+    leaf(t.start),
+    isoDate(t.end) && t.end !== t.start ? [h('span', {class:'arrow', 'aria-hidden':'true'}, '→'), leaf(t.end)] : null,
+    h('span', {class:'meta'}, nights > 0 ? nights + (nights === 1 ? ' natt' : ' netter') : 'dagstur', year !== thisYear ? h('small', null, year) : null));
+}
 function tripRange(t){
   if (!isoDate(t.start) || !isoDate(t.end)) return '';
   const a = D(t.start), b = D(t.end);
@@ -1238,7 +1250,7 @@ function homeView(){
           cover ? h('img', {class:'tripcard-bg', src:cover, alt:'', referrerpolicy:'no-referrer', onerror: e => { e.target.closest('.tripcard').classList.remove('has-cover'); e.target.remove(); }}) : null,
           h('div', {class:'tripcard-top'}, h('span', {class:'eyebrow'}, t.note || 'Tur'), h('span', {class:'countpill' + (tripPill(t) === 'pågår nå' ? ' live' : '')}, tripPill(t))),
           h('div', {class:'tripcard-title'}, t.title || 'Uten navn'),
-          h('div', {class:'tripcard-foot'}, h('span', null, tripRange(t) || 'Ingen datoer ennå'), ids.length ? h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true))) : null));
+          h('div', {class:'tripcard-foot'}, tripDates(t), ids.length ? h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true))) : null));
       }),
       S.homeTab === 'next' ? h('button', {class:'addcard tripadd', onclick:() => newTripSheet()}, h('b', null, '+'), 'Ny tur') : null,
       !list.length && S.homeTab === 'past' ? h('p', {class:'muted'}, 'Ingen tidligere turer ennå.') : null

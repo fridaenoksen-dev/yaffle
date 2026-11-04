@@ -243,6 +243,21 @@ button{cursor:pointer}
 .tripcard-title{font-family:var(--display);font-weight:900;font-size:clamp(36px,10vw,56px);line-height:.9;letter-spacing:-.05em;text-transform:uppercase;overflow-wrap:anywhere}
 .tripcard-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--text);font-size:15px}
 .tripcard:active{transform:scale(.99)}
+.datechip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:18px;background:var(--paper);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.datechip.empty{padding:8px 14px;font-size:14px;font-weight:600;color:var(--muted)}
+.datechip .leaf{display:grid;place-items:center;min-width:44px;padding:5px 6px 4px;border-radius:12px;background:var(--fog);line-height:1}
+.datechip .leaf b{font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.datechip .leaf small{font-size:10px;font-weight:700;letter-spacing:.08em;margin-top:3px;color:var(--muted)}
+.datechip .arrow{font-weight:700;opacity:.6}
+.datechip .meta{display:grid;font-size:13px;font-weight:600;line-height:1.2;padding-left:4px}
+.datechip .meta small{font-size:11px;font-weight:500;opacity:.7}
+.tripcard.has-cover .datechip{background:rgba(255,255,255,.16);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4)}
+.tripcard.has-cover .datechip .leaf{background:#fff;color:#0e0f0c}
+.tripcard.has-cover .datechip .meta,.tripcard.current .datechip .meta,.tripcard.has-cover .datechip .arrow{color:#fff;opacity:1}
+.tripcard.has-cover .datechip .meta small{opacity:.8}
+.tripcard.has-cover .datechip .leaf small{color:#cb272f}
+.tripcard.current:not(.has-cover) .datechip{background:rgba(255,255,255,.1);color:#fff;box-shadow:none}
+.tripcard.current:not(.has-cover) .datechip .leaf{background:#fff;color:#0e0f0c}
 .tripcard{position:relative;overflow:hidden;isolation:isolate}
 .tripcard-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
 .tripcard.has-cover{min-height:220px;align-content:space-between;color:#fff;background:#0e0f0c}
