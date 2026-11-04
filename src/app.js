@@ -527,10 +527,19 @@ function planView(){
   const stays = S.items.filter(i => i.kind === 'stay' && isoDate(i.date) && isoDate(i.endDate));
   const now = new Date(); const todayIso = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
   days.forEach((day, idx) => {
+    // Bookinger uten klokkeslett (f.eks. taxi) plasseres foran neste booking med klokkeslett, etter rekkefølgen de ble lagt inn
+    const dayItems = S.items.filter(i => i.date === day).sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.createdAt || 0) - (b.createdAt || 0));
+    const eff = new Map();
+    dayItems.forEach((it, k) => {
+      if (it.time){ eff.set(it, it.time + '|1'); return; }
+      const next = dayItems.slice(k + 1).find(x => x.time), prev = dayItems.slice(0, k).reverse().find(x => x.time);
+      eff.set(it, next ? next.time + '|0' : prev ? prev.time + '|2' : '00:00|0');
+    });
+    const key = e => (e.type === 'item' ? eff.get(e.x) : (e.x.time ? e.x.time + '|1' : '99:99|9')) + '|' + String(e.x.order != null ? e.x.order : 999).padStart(4,'0') + '|' + (e.x.createdAt || 0);
     const entries = [
-      ...S.items.filter(i => i.date === day).map(i => ({type:'item', x:i})),
+      ...dayItems.map(i => ({type:'item', x:i})),
       ...S.ideas.filter(i => i.day === day).map(i => ({type:'idea', x:i}))
-    ].sort((a, b) => sortKey(a.x) < sortKey(b.x) ? -1 : 1);
+    ].sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
     const sleeping = stays.filter(s => s.date < day && s.endDate > day);
     const d = D(day);
     cols.push(h('section', {class:'day' + (day === todayIso ? ' today' : ''), 'aria-label':dayLabel(day)},
