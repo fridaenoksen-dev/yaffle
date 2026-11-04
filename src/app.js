@@ -807,12 +807,7 @@ function ideaCard(i){
     h('span', {class:'ph', style:catStyle(c)},
       media,
       h('span', {class:'tag'}, cname),
-      allin ? h('span', {class:'allin'}, 'Alle er med!') : null,
-      h('button', {class:'heartcount' + (mine ? ' mine' : ''), type:'button', 'aria-pressed': String(!!mine), disabled: !S.canWrite || !S.me,
-        'aria-label': (mine ? 'Fjern hjertet ditt fra ' : 'Gi hjerte til ') + (i.title || 'idéen') + ' (' + who.length + ' av ' + groupSize() + ')',
-        onclick: e => { e.stopPropagation(); if (!S.me) return; write('ideas/' + i.id, () => S.db.doc('ideas/' + i.id).update({hearts:{[S.me]: !mine}})); },
-        onkeydown: e => e.stopPropagation()},
-        h('span', {svg:ICONS.heart, style:'display:inline-flex'}), who.length + '/' + groupSize())
+      allin ? h('span', {class:'allin'}, 'Alle er med!') : null
     ),
     h('span', {class:'cap'},
       h('h3', null, i.title || 'Idé'),
@@ -935,7 +930,7 @@ function mapView(list){
       const img = ideaImage(i);
       const esc = v => String(v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
       const face2 = img ? '<img src="' + esc(img.src) + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">' : '';
-      const num = dayIdeas ? '<em>' + (k + 1) + '</em>' : (isAllIn(i) ? '<em class="heartbadge">♥</em>' : '');
+      const num = dayIdeas ? '<em>' + (k + 1) + '</em>' : '';
       const html = '<span class="pinb' + (img ? ' has-img' : '') + '" style="' + catStyle(c) + '"><span class="pinb-face">' + (ICONS[c.icon] || ICONS.other) + face2 + '</span>' + num + '</span>';
       const m = L.marker([Number(i.lat), Number(i.lng)], {icon: L.divIcon({className:'', html, iconSize:[46, 54], iconAnchor:[23, 52]}), title:i.title + ' (' + cname + ')', keyboard:true, riseOnHover:true});
       m.bindTooltip(callout(i.title, (dayIdeas && i.time ? i.time + ' · ' : '') + cname), {permanent:true, direction:'right', offset:[8, -28], className:'callout'});
