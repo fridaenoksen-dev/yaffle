@@ -357,7 +357,11 @@ function hero(){
   const ids = memberIds();
   const nights = Math.max(0, days.length - 1);
   const cover = tripCover(t);
-  return h('header', {class:'hero' + (cover ? ' has-cover' : '')},
+  const edit = S.canWrite ? e => { if (!e.target.closest('button')) tripSheet(); } : null;
+  return h('header', {class:'hero' + (cover ? ' has-cover' : '') + (edit ? ' editable' : ''), onclick:edit,
+      role: edit ? 'button' : null, tabindex: edit ? '0' : null, 'aria-label': edit ? 'Endre turdetaljer' : null,
+      onkeydown: edit ? e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget){ e.preventDefault(); tripSheet(); } } : null},
+    edit ? h('span', {class:'hero-edit', 'aria-hidden':'true'}, 'Endre') : null,
     cover ? h('img', {class:'hero-bg', src:cover, alt:'', referrerpolicy:'no-referrer', onerror: e => { e.target.closest('.hero').classList.remove('has-cover'); e.target.remove(); }}) : null,
     h('h1', null, t.title || 'Turen'),
     heroDates(days),
@@ -1345,9 +1349,49 @@ function tripSheet(){
     field('Eller bilde fra nett', 't-cover', coverUrl),
     h('p', {class:'muted', style:'margin:-6px 0 0;font-size:13px'}, 'Uten bilde bruker Yaffle Wikipedia-bildet av stedet.'),
     h('p', {class:'muted', style:'margin:0;font-size:14px'}, '«Alle er med» vises når så mange har gitt hjerte til en idé.'),
-    h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre'))
+    h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre')),
+    S.trip && S.tripId ? dangerZone() : null
   );
   openSheet(h('h2', null, S.trip ? 'Endre tur' : 'Ny tur'), form);
+}
+// Slett turen (den som lagde den) eller forlat den (alle andre)
+function dangerZone(){
+  const tid = S.tripId, name = (S.trip && S.trip.title) || 'turen';
+  const box = h('div', {class:'dangerzone'}, h('p', {class:'muted'}, 'Sjekker …'));
+  const leaveDone = () => { try { localStorage.removeItem('yaffle-trip'); } catch(_){} location.href = location.pathname + '#hjem'; };
+  const twoTap = (label, confirmLabel, fn) => {
+    let armed = false, busy = false;
+    const b = h('button', {type:'button', class:'btn danger', onclick: async () => {
+      if (busy) return;
+      if (!armed){ armed = true; b.textContent = confirmLabel; setTimeout(() => { if (!busy){ armed = false; b.textContent = label; } }, 4000); return; }
+      busy = true; b.textContent = 'Et øyeblikk …'; b.disabled = true;
+      try { await fn(); } catch(e){ busy = false; armed = false; b.disabled = false; b.textContent = label; toast(e && e.message ? e.message : 'Det gikk ikke. Prøv igjen.'); }
+    }}, label);
+    return b;
+  };
+  const leave = twoTap('Forlat turen', 'Sikker? Trykk igjen', async () => {
+    const { error } = await window.yaffleRpc('leave_trip', {p_trip: tid});
+    if (error) throw new Error('Fikk ikke forlatt turen.');
+    leaveDone();
+  });
+  (async () => {
+    let owner = false;
+    try { const { data, error } = await window.yaffleRpc('is_trip_owner', {p_trip: tid}); owner = error ? /function|schema/i.test(error.message || '') : !!data; } catch(_){}
+    if (!owner){
+      box.replaceChildren(h('h3', null, 'Forlat turen'), h('p', {class:'muted'}, 'Du forsvinner fra gjengen på ' + name + '. Du kan bli med igjen via en invitasjonslenke.'), leave);
+      return;
+    }
+    box.replaceChildren(
+      h('h3', null, 'Slett turen'),
+      h('p', {class:'muted'}, 'Sletter ' + name + ' for alle: plan, idéer, pakkelister, kvitteringer og bilder. Dette kan ikke angres.'),
+      twoTap('Slett turen', 'Slett for alle? Trykk igjen', async () => {
+        try { await window.yaffleRemoveTripFiles(tid); } catch(_){ throw new Error('Fikk ikke slettet filene. Prøv igjen.'); }
+        const { error } = await window.yaffleRpc('delete_trip', {p_trip: tid});
+        if (error) throw new Error(/function|schema/i.test(error.message) ? 'Sletting er ikke satt opp ennå (kjør slett-tur.sql i Supabase).' : 'Fikk ikke slettet turen.');
+        leaveDone();
+      }));
+  })();
+  return box;
 }
 
 

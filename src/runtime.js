@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261104l";
+import * as CONFIG from "./config.js?v=20261104m";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 const app = document.getElementById("app");
@@ -538,6 +538,19 @@ async function start(session) {
   let nick = null; try { nick = sessionStorage.getItem("yaffle-nick"); sessionStorage.removeItem("yaffle-nick"); } catch (e) {}
   if (nick) { await sb.from("docs").upsert({ path: "profiles/" + session.user.id, collection: "profiles", data: { nick } }); }
   window.yaffleRpc = (name, args) => sb.rpc(name, args);
+  // Fjerner alle opplastede filer for en tur (kvitteringer, bilder) før turen slettes.
+  window.yaffleRemoveTripFiles = async (tid) => {
+    const folder = String(tid).replace(/[^a-zA-Z0-9_-]/g, "");
+    if (!folder) return;
+    for (let round = 0; round < 20; round++) {
+      const { data, error } = await sb.storage.from(BUCKET).list(folder, { limit: 100 });
+      if (error) throw error;
+      const files = (data || []).filter(f => f.id).map(f => folder + "/" + f.name);
+      if (!files.length) return;
+      const { error: e2 } = await sb.storage.from(BUCKET).remove(files);
+      if (e2) throw e2;
+    }
+  };
   window.yaffleCartoKey = CONFIG.CARTO_KEY || "";
   window.yaffleNotice = alert_msg;
   loaded = loadAll();
@@ -558,7 +571,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261104l");
+  await import("./app.js?v=20261104m");
 }
 
 const {
