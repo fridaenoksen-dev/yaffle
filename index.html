@@ -741,16 +741,25 @@ html,body{overflow-x:clip}
 
 /* Dagkolonnene i planen: lys beige flate, hvite kort */
 .hscroll .day{background:#f3e9de!important}
+.hscroll .dayinfo{background:#fbf6f0;border-radius:18px;padding:14px 12px 10px;margin:-4px -2px 12px;display:grid;gap:8px}
+.hscroll .dayinfo .dayhead{margin:0;padding:0}
+.hscroll .dayinfo .wx{margin:0;padding:0}
+.hscroll .dayinfo .sleep{padding:0;align-items:flex-start;line-height:1.35}
 .hscroll .day.today{box-shadow:0 0 0 2px #faae33!important}
 .hscroll .daytag{background:#d1255c;color:#fff}
 .hscroll .dayname span,.hscroll .sleep{color:#7a4b31}
 .hscroll .sleep b{color:#402011!important}
+/* Booket og betalt: dempet olivengrønn som passer til de varme brunfargene */
+.pill.ok{background:#e6eedb!important;color:#3f5a26!important}
+.pill.ok .dot{background:#5b7f36!important}
+:root[data-theme="dark"] .pill.ok{background:#25331a!important;color:#b9d49a!important}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.ok{background:#25331a!important;color:#b9d49a!important}}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261105f"></script>
+<script type="module" src="./src/runtime.js?v=20261105g"></script>
 </body>
 </html>

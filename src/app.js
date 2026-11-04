@@ -543,14 +543,16 @@ function planView(){
     const sleeping = stays.filter(s => s.date < day && s.endDate > day);
     const d = D(day);
     cols.push(h('section', {class:'day' + (day === todayIso ? ' today' : ''), 'aria-label':dayLabel(day)},
-      h('div', {class:'dayhead'},
-        h('div', {class:'daynum'}, d.getUTCDate()),
-        h('div', {class:'dayname'}, cap(WD[d.getUTCDay()]), h('span', null, 'Dag ' + (idx+1) + (placesOn(day).length ? ' · ' + placesOn(day).join(' → ') : ''))),
-        idx === 0 ? h('span', {class:'daytag'}, 'Avreise') : idx === days.length - 1 ? h('span', {class:'daytag'}, 'Hjemreise') : null
+      h('div', {class:'dayinfo'},
+        h('div', {class:'dayhead'},
+          h('div', {class:'daynum'}, d.getUTCDate()),
+          h('div', {class:'dayname'}, cap(WD[d.getUTCDay()]), h('span', null, 'Dag ' + (idx+1) + (placesOn(day).length ? ' · ' + placesOn(day).join(' → ') : ''))),
+          idx === 0 ? h('span', {class:'daytag'}, 'Avreise') : idx === days.length - 1 ? h('span', {class:'daytag'}, 'Hjemreise') : null
+        ),
+        weatherLine(day),
+        sleeping.map(s => h('div', {class:'sleep'}, h('span', {class:'tile stay', style:'width:24px;height:24px;border-radius:8px', svg:ICONS.stay}), h('span', null, 'Dere bor på ', h('b', {style:'color:var(--ink)'}, s.title))))
       ),
-      weatherLine(day),
       h('div', {class:'stack', style:'flex:1;align-content:start'},
-        sleeping.map(s => h('div', {class:'sleep'}, h('span', {class:'tile stay', style:'width:24px;height:24px;border-radius:8px', svg:ICONS.stay}), 'Dere bor på ', h('b', {style:'color:var(--ink)'}, s.title))),
         groupTravel(entries).map(e => e.type === 'travel' ? travelBlock(e.items) : e.type === 'item' ? itemCard(e.x) : plannedIdeaCard(e.x)),
         entries.length === 0 ? h('p', {class:'muted', style:'margin:4px'}, 'Fri dag så langt. Flytt en idé hit fra tavla.') : null
       ),
