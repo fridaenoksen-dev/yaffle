@@ -747,18 +747,33 @@ function loadLeaflet(){
   return L_ready;
 }
 const hasPos = x => Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && x.lat !== null && x.lng !== null && x.lat !== '' ;
+let mapLayers = null;
+function walkMin(a, b){
+  // Luftlinje × 1,3 for gater, 80 m i minuttet
+  const dy = (a[0] - b[0]) * 111320, dx = (a[1] - b[1]) * 111320 * Math.cos(a[0] * Math.PI / 180);
+  return Math.max(1, Math.round(Math.hypot(dx, dy) * 1.3 / 80));
+}
 function mapView(list){
   if (!mapEl){ mapEl = h('div', {class:'mapbox', role:'region', 'aria-label':'Kart over idéene'}); }
-  const placed = list.filter(hasPos);
-  const missing = list.filter(i => !hasPos(i));
+  const days = tripDays();
+  if (S.mapDay && !days.includes(S.mapDay)) S.mapDay = null;
+  const dayIdeas = S.mapDay ? S.ideas.filter(i => i.day === S.mapDay && hasPos(i)).sort((a, b) => (a.time || '99') < (b.time || '99') ? -1 : 1) : null;
+  const shown = dayIdeas || list.filter(hasPos);
+  const missing = (dayIdeas ? S.ideas.filter(i => i.day === S.mapDay) : list).filter(i => !hasPos(i));
   const stays = S.items.filter(i => i.kind === 'stay' && hasPos(i));
   locateStays();
   loadLeaflet().then(L => {
     if (!map){
-      map = L.map(mapEl, {scrollWheelZoom:false, zoomControl:true});
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
-      markerLayer = L.layerGroup().addTo(map);
+      map = L.map(mapEl, {scrollWheelZoom:false, zoomControl:false, attributionControl:true});
+      const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/' + (dark ? 'dark_all' : 'light_all') + '/{z}/{x}/{y}{r}.png', {maxZoom:20, subdomains:'abcd',
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
+      L.control.zoom({position:'topright'}).addTo(map);
+      mapLayers = {lines:L.layerGroup().addTo(map), marks:L.layerGroup().addTo(map)};
+      markerLayer = mapLayers.marks;
       map.setView([54.349, 18.653], 14);
+      const labels = () => mapEl.classList.toggle('show-labels', map.getZoom() >= 16 || !!S.mapDay);
+      map.on('zoomend', labels); labels();
       map.on('click', async e => {
         if (!placing) return;
         const id = placing; placing = null; mapEl.classList.remove('placing');
@@ -767,30 +782,54 @@ function mapView(list){
         render();
       });
     }
-    markerLayer.clearLayers();
+    mapLayers.lines.clearLayers(); mapLayers.marks.clearLayers();
+    mapEl.classList.toggle('show-labels', map.getZoom() >= 16 || !!S.mapDay);
     const pts = [];
-    for (const s of stays){
-      const m = L.marker([Number(s.lat), Number(s.lng)], {icon: L.divIcon({className:'', html:'<span class="mk-home-wrap"><span class="mk-pulse"></span><span class="mk mk-home">' + ICONS.stay + '</span></span>', iconSize:[48, 48], iconAnchor:[24, 24]}), title:'Her bor dere: ' + s.title, keyboard:true, zIndexOffset:1000});
-      const label = document.createElement('span'); label.textContent = 'Her bor dere';
-      m.bindTooltip(label, {permanent:true, direction:'bottom', offset:[0, 20], className:'home-label'});
-      m.on('click', () => itemSheet(s)); markerLayer.addLayer(m); pts.push([Number(s.lat), Number(s.lng)]);
+    const callout = (title, sub, cls) => { const el = document.createElement('span'); el.className = 'callout-in' + (cls ? ' ' + cls : '');
+      const col = document.createElement('span'); col.className = 'callout-txt';
+      const t = document.createElement('b'); t.textContent = title; col.append(t);
+      if (sub){ const s2 = document.createElement('small'); s2.textContent = sub; col.append(s2); }
+      el.append(col);
+      const ch = document.createElement('i'); ch.textContent = '›'; el.append(ch); return el; };
+    const home = stays[0] ? [Number(stays[0].lat), Number(stays[0].lng)] : null;
+    for (const st of stays){
+      const m = L.marker([Number(st.lat), Number(st.lng)], {icon: L.divIcon({className:'', html:'<span class="mk2 mk2-home">' + ICONS.stay + '</span>', iconSize:[30, 30], iconAnchor:[15, 15]}), title:'Her bor dere: ' + st.title, keyboard:true, zIndexOffset:1000});
+      m.bindTooltip(callout('Her bor dere'), {permanent:true, direction:'right', offset:[14, 0], className:'callout callout-home'});
+      m.on('click', () => itemSheet(st)); mapLayers.marks.addLayer(m); pts.push([Number(st.lat), Number(st.lng)]);
     }
-    for (const i of placed){
+    shown.forEach((i, k) => {
       const [cname, c] = catOf(i.category);
-      const html = '<span class="mk' + (isAllIn(i) ? ' mk-allin' : '') + '" style="' + catStyle(c) + '">' + (ICONS[c.icon] || ICONS.other) + '</span>';
-      const m = L.marker([Number(i.lat), Number(i.lng)], {icon: L.divIcon({className:'', html, iconSize:[34, 34], iconAnchor:[17, 17]}), title:i.title + ' (' + cname + ')', keyboard:true, riseOnHover:true});
-      m.bindTooltip(i.title, {direction:'top', offset:[0, -16]});
-      m.on('click', () => ideaDetail(i.id)); markerLayer.addLayer(m); pts.push([Number(i.lat), Number(i.lng)]);
+      const num = dayIdeas ? '<em>' + (k + 1) + '</em>' : '';
+      const html = '<span class="mk2' + (isAllIn(i) ? ' mk2-allin' : '') + '" style="' + catStyle(c) + '">' + num + '<span class="mk2-dot"></span></span>';
+      const m = L.marker([Number(i.lat), Number(i.lng)], {icon: L.divIcon({className:'', html, iconSize:[22, 22], iconAnchor:[11, 11]}), title:i.title + ' (' + cname + ')', keyboard:true, riseOnHover:true});
+      m.bindTooltip(callout(i.title, (dayIdeas && i.time ? i.time + ' · ' : '') + cname), {permanent:true, direction:'right', offset:[12, 0], className:'callout'});
+      m.on('click', () => ideaDetail(i.id)); mapLayers.marks.addLayer(m); pts.push([Number(i.lat), Number(i.lng)]);
+    });
+    // Dagsrute: fra der dere bor, gjennom dagens idéer i tidsrekkefølge
+    if (dayIdeas && dayIdeas.length){
+      const route = [...(home ? [home] : []), ...dayIdeas.map(i => [Number(i.lat), Number(i.lng)])];
+      L.polyline(route, {color: getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#0e0f0c', weight:4, opacity:.9, lineJoin:'round'}).addTo(mapLayers.lines);
+      for (let k = 1; k < route.length; k++){
+        const a = route[k - 1], b = route[k];
+        if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.003) continue;
+        const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const min = walkMin(a, b);
+        L.marker(mid, {interactive:false, icon: L.divIcon({className:'', html:'<span class="walk"><b>' + (min > 90 ? Math.round(min / 60) + '' : min) + '</b><small>' + (min > 90 ? 'T' : 'MIN') + '</small></span>', iconSize:[32, 32], iconAnchor:[16, 16]})}).addTo(mapLayers.lines);
+      }
     }
-    // Zoom til sentrum: ta med punkter innen ca. 5 km fra der dere bor (eller midten av punktene)
-    const home = pts.length ? (stays.length ? [Number(stays[0].lat), Number(stays[0].lng)] : pts[0]) : null;
-    const near = home ? pts.filter(p => Math.hypot((p[0] - home[0]) * 111, (p[1] - home[1]) * 65) < 5) : [];
-    setTimeout(() => { map.invalidateSize(); if (!mapFitted && pts.length){ map.fitBounds(near.length > 1 ? near : pts, {padding:[40, 40], maxZoom:16}); mapFitted = true; } }, 50);
+    const near = home ? pts.filter(p => Math.hypot((p[0] - home[0]) * 111, (p[1] - home[1]) * 65) < 5) : pts;
+    const key = (S.mapDay || 'alle') + ':' + pts.length;
+    setTimeout(() => { map.invalidateSize(); if ((!mapFitted || mapFitted !== key) && pts.length){ map.fitBounds(dayIdeas ? pts : (near.length > 1 ? near : pts), {padding:[50, 50], maxZoom:16}); mapFitted = key; } }, 50);
   }).catch(() => { mapEl.textContent = 'Kartet kunne ikke lastes. Sjekk nettet.'; });
   const homeStay = stays[0];
-  return [mapEl,
+  const dayBtn = (d, label) => h('button', {'aria-pressed': String((S.mapDay || null) === d), onclick:() => { S.mapDay = d; render(); }}, label);
+  return [
+    days.length ? h('div', {class:'daychips-row map-days', role:'group', 'aria-label':'Vis dag på kartet'},
+      dayBtn(null, 'Alle'), days.map(d => dayBtn(d, dayLabel(d, true)))) : null,
+    h('div', {class:'mapwrap'}, mapEl,
+      dayIdeas ? h('div', {class:'map-sheet'}, h('b', null, dayLabel(S.mapDay)),
+        h('span', {class:'muted'}, dayIdeas.length ? dayIdeas.length + (dayIdeas.length === 1 ? ' stopp' : ' stopp') + ' · gangtid er omtrentlig' : 'Ingen planlagte idéer med sted denne dagen')) : null),
     h('div', {class:'maptools'},
-      homeStay ? h('button', {class:'pill neutral', onclick:() => { if (map) map.setView([Number(homeStay.lat), Number(homeStay.lng)], 16); }}, h('span', {class:'mk mk-home', style:'width:20px;height:20px;box-shadow:none', svg:ICONS.stay}), 'Vis hvor dere bor')
+      homeStay ? h('button', {class:'pill neutral', onclick:() => { if (map) map.setView([Number(homeStay.lat), Number(homeStay.lng)], 16); }}, h('span', {svg:ICONS.stay, style:'display:inline-flex'}), 'Vis hvor dere bor')
         : (() => { const st = S.items.find(i => i.kind === 'stay'); return st && S.canWrite
             ? h('button', {class:'pill ' + (placing ? 'ok' : 'neutral'), onclick:() => { placing = placing ? null : st.id; mapEl.classList.toggle('placing', !!placing); render(); if (placing) toast('Trykk på kartet der dere bor'); }}, placing ? 'Trykk på kartet der dere bor …' : 'Plasser overnattingen på kartet')
             : h('span', {class:'muted', style:'font-size:14px'}, 'Legg inn adressen på overnattingen i planen, så vises den på kartet.'); })(),
