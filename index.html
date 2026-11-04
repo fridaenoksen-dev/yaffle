@@ -738,12 +738,25 @@ html,body{overflow-x:clip}
 .foot p{color:#e2b98f}
 .foot .foot-meta{color:#c79469}
 .foot-logo:not(.inline){background:#faae33}
+
+/* Brune dagkolonner i planen, lyse kort inni */
+.hscroll .day{background:#5a2810!important}
+.hscroll .day.today{box-shadow:0 0 0 2px #faae33!important}
+.hscroll .daynum,.hscroll .dayname{color:#fff3e0}
+.hscroll .dayname span{color:#e2b98f}
+.hscroll .daytag{background:#d1255c;color:#fff}
+.hscroll .wx{color:#f6dfc4}
+.hscroll .wx span{color:#e2b98f!important}
+.hscroll .wx b{color:#fff3e0!important}
+.hscroll .wx-ic svg{stroke:#fff3e0}
+.hscroll .sleep{color:#e2b98f}
+.hscroll .sleep b{color:#fff3e0!important}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261104x"></script>
+<script type="module" src="./src/runtime.js?v=20261104y"></script>
 </body>
 </html>
