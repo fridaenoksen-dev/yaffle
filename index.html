@@ -576,6 +576,27 @@ dialog.taxi .close{background:#0e0f0c;color:#fff}
 .hero.has-cover .hd-range{background:rgba(14,15,12,.55);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);color:#fff;padding:7px 14px;border-radius:50px}
 .hero.has-cover .hd-nights{background:rgba(14,15,12,.55)!important;color:#fff!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .hero.has-cover .hd-sep{background:rgba(255,255,255,.8)}
+.boardtools{position:sticky;top:76px;z-index:4;background:var(--canvas);margin:0 -4px 14px;padding:6px 4px 10px;display:grid;gap:8px}
+.boardtools .folder-row{margin:0}
+.boardtools .boardrow{display:flex;align-items:center;gap:8px;flex:none}
+.boardtools .seg{flex:0 1 auto;min-width:0}
+.boardtools .seg button small{font-size:12px;opacity:.7;font-variant-numeric:tabular-nums}
+.viewtoggle{margin-left:auto;flex:none;width:42px;height:42px;border-radius:50%;border:0;background:var(--paper);box-shadow:0 0 0 1px var(--line);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.viewtoggle[aria-pressed="true"]{background:#000;color:#fff;box-shadow:none}
+.folder-chip.add{padding:9px 12px}
+.legcard{display:flex;align-items:center;gap:12px;background:var(--paper);border-radius:18px;padding:10px 14px 10px 10px;margin:0 0 14px;box-shadow:var(--glow)}
+.legcard-img{width:46px;height:46px;border-radius:12px;background:var(--fog);overflow:hidden;flex:none}
+.legcard-img img{width:100%;height:100%;object-fit:cover;display:block}
+.legcard b{display:block;font-size:16px;color:var(--ink)}
+.legcard span:not(.legcard-img){font-size:13px;color:var(--muted)}
+.leg-edit{display:grid;gap:8px;padding:12px;border-radius:16px;background:var(--fog)}
+.leg-edit .input{background:var(--paper)}
+.leg-date{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.dragtray{position:fixed;left:50%;bottom:0;transform:translate(-50%,110%);width:min(640px,100%);background:var(--paper);border-radius:24px 24px 0 0;box-shadow:0 -1px 0 var(--line),0 -12px 40px rgba(0,0,0,.12);padding:14px 18px calc(18px + env(safe-area-inset-bottom));z-index:30;transition:transform .2s ease}
+.dragtray.open{transform:translate(-50%,0)}
+.dragtray p{margin:0 0 10px;font-size:13px;font-weight:600;color:var(--muted)}
+.dragtray-days{display:flex;flex-wrap:wrap;gap:8px}
+.dragtray .drop{padding:12px 18px}
 .hero.editable{cursor:pointer}
 .hero-edit{position:absolute;top:14px;right:14px;z-index:2;font-size:12px;font-weight:600;color:#fff;background:rgba(14,15,12,.4);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);padding:5px 11px;border-radius:50px}
 .hero.editable:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
@@ -663,6 +684,6 @@ dialog.sheet{border-radius:30px 30px 0 0}
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261104m"></script>
+<script type="module" src="./src/runtime.js?v=20261104n"></script>
 </body>
 </html>

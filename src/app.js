@@ -37,7 +37,10 @@ const ICONS = {
   museum:'<svg viewBox="0 0 24 24"><path d="M3 9 12 4l9 5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/></svg>',
   train:'<svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 11h12"/><circle cx="9" cy="14" r=".8"/><circle cx="15" cy="14" r=".8"/><path d="m8 21 2-4M16 21l-2-4"/></svg>',
   moon:'<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
-  clip:'<svg viewBox="0 0 24 24"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3L15 7.5"/></svg>'
+  clip:'<svg viewBox="0 0 24 24"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3L15 7.5"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  map:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
+  grid:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/></svg>'
 };
 const KINDS = [
   ['car','Bil'],['parking','Parkering'],['flight','Fly'],['taxi','Taxi'],['stay','Overnatting'],['food','Mat'],['activity','Aktivitet'],['other','Annet']
@@ -496,7 +499,7 @@ function planView(){
     cols.push(h('section', {class:'day' + (day === todayIso ? ' today' : ''), 'aria-label':dayLabel(day)},
       h('div', {class:'dayhead'},
         h('div', {class:'daynum'}, d.getUTCDate()),
-        h('div', {class:'dayname'}, cap(WD[d.getUTCDay()]), h('span', null, 'Dag ' + (idx+1))),
+        h('div', {class:'dayname'}, cap(WD[d.getUTCDay()]), h('span', null, 'Dag ' + (idx+1) + (placesOn(day).length ? ' · ' + placesOn(day).join(' → ') : ''))),
         idx === 0 ? h('span', {class:'daytag'}, 'Avreise') : idx === days.length - 1 ? h('span', {class:'daytag'}, 'Hjemreise') : null
       ),
       weatherLine(day),
@@ -669,31 +672,46 @@ async function moveIdea(i, day){
 /* ---------- steder (mapper) på idétavla ---------- */
 function tripFolders(){ return (S.trip && Array.isArray(S.trip.folders)) ? S.trip.folders : []; }
 function folderName(id){ const f = tripFolders().find(x => x.id === id); return f ? f.name : ''; }
+// Et sted kan ha egne datoer (en etappe av turen)
+function folderDays(f){ if (!f || !isoDate(f.start)) return []; const end = isoDate(f.end) ? f.end : f.start; return tripDays().filter(d => d >= f.start && d <= end); }
+function folderRange(f){
+  if (!f || !isoDate(f.start)) return '';
+  const a = D(f.start), b = D(isoDate(f.end) ? f.end : f.start);
+  if (f.start === (f.end || f.start)) return a.getUTCDate() + '.';
+  return a.getUTCMonth() === b.getUTCMonth() ? a.getUTCDate() + '.–' + b.getUTCDate() + '.' : a.getUTCDate() + '. ' + MON[a.getUTCMonth()] + '–' + b.getUTCDate() + '. ' + MON[b.getUTCMonth()];
+}
+function placesOn(day){ return tripFolders().filter(f => folderDays(f).includes(day)).map(f => f.name); }
+// Dagene en idé kan flyttes til: stedets dager hvis stedet har datoer, ellers hele turen
+function daysFor(i){ const f = i && tripFolders().find(x => x.id === i.folder); const fd = folderDays(f); return fd.length ? fd : tripDays(); }
 async function saveFolders(list){ return write('trip/main', () => S.db.doc('trip/main').update({folders: list})); }
 function folderRow(folders){
   const count = id => S.ideas.filter(i => id ? i.folder === id : true).length;
-  const chip = (id, label) => h('button', {class:'folder-chip', 'aria-pressed': String((S.folder || null) === id), onclick:() => { S.folder = id; mapFitted = false; render(); }},
-    label, h('small', null, count(id)));
-  if (!folders.length) return null;
+  const chip = (id, label, sub) => h('button', {class:'folder-chip', 'aria-pressed': String((S.folder || null) === id), onclick:() => { S.folder = id; mapFitted = false; render(); }},
+    label, h('small', null, sub || count(id)));
+  if (!folders.length && !S.canWrite) return null;
   return h('div', {class:'folder-row', role:'group', 'aria-label':'Steder'},
-    chip(null, 'Alle steder'),
-    folders.map(f => chip(f.id, f.name)),
-    S.canWrite ? h('button', {class:'folder-chip add', 'aria-label':'Endre steder', onclick:() => foldersSheet()}, folders.length ? 'Endre' : '+ Sted') : null);
+    chip(null, folders.length ? 'Alle' : 'Alle idéer'),
+    folders.map(f => chip(f.id, f.name, folderRange(f))),
+    S.canWrite ? h('button', {class:'folder-chip add', 'aria-label': folders.length ? 'Legg til eller endre steder' : 'Legg til sted', title:'Steder på turen', onclick:() => foldersSheet()},
+      h('span', {svg:ICONS.plus || '', style:'display:inline-flex'}), folders.length ? null : 'Sted') : null);
 }
 function foldersSheet(){
   let list = tripFolders().map(f => ({...f}));
   const body = h('div', {class:'form'});
   const draw = () => {
     body.replaceChildren(
-      h('p', {class:'muted', style:'margin:0'}, 'Skal dere flere steder på turen? Lag et sted for hver by eller område, så kan idéene sorteres etter hvor dere er.'),
+      h('p', {class:'muted', style:'margin:0'}, 'Skal dere flere steder på turen? Lag et sted for hver by eller område. Med datoer vises stedet i planen, og idéene foreslås bare for de dagene.'),
       list.length ? h('div', {class:'stack'}, list.map((f, k) => {
         const inp = h('input', {class:'input', value:f.name, maxlength:'30', 'aria-label':'Navn på sted', oninput: e => { list[k].name = e.target.value; }});
+        const t = S.trip || {};
+        const dIn = (key, label) => h('input', {class:'input', type:'date', value:f[key] || '', min:t.start || null, max:t.end || null, 'aria-label':label + ' ' + (f.name || ''), onchange: e => { list[k][key] = e.target.value; }});
         let armed = false;
         const del = h('button', {class:'check-del', type:'button', 'aria-label':'Fjern ' + f.name, onclick: () => {
           if (!armed){ armed = true; del.textContent = 'Fjern?'; del.classList.add('armed'); setTimeout(() => { armed = false; del.textContent = '×'; del.classList.remove('armed'); }, 3000); return; }
           list.splice(k, 1); draw();
         }}, '×');
-        return h('div', {style:'display:flex;gap:8px;align-items:center'}, inp, del);
+        return h('div', {class:'leg-edit'}, h('div', {style:'display:flex;gap:8px;align-items:center'}, inp, del),
+          h('div', {class:'row2'}, h('label', {class:'leg-date'}, h('span', null, 'Fra'), dIn('start', 'Fra')), h('label', {class:'leg-date'}, h('span', null, 'Til'), dIn('end', 'Til'))));
       })) : null,
       (() => {
         const inp = h('input', {class:'input', placeholder:'Nytt sted, f.eks. Warszawa', maxlength:'30', 'aria-label':'Nytt sted'});
@@ -701,9 +719,11 @@ function foldersSheet(){
         inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
         return h('div', {class:'quickadd'}, inp, h('button', {class:'btn dark', type:'button', onclick:add}, 'Legg til'));
       })(),
-      h('p', {class:'muted', style:'margin:0;font-size:13px'}, 'Fjerner du et sted, blir idéene liggende under «Alle steder».'),
+      h('p', {class:'muted', style:'margin:0;font-size:13px'}, 'Fjerner du et sted, blir idéene liggende under «Alle».'),
       h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'button', onclick: async () => {
-        const clean = list.map(f => ({id:f.id, name:String(f.name || '').trim()})).filter(f => f.name);
+        const bad = list.find(f => isoDate(f.start) && isoDate(f.end) && f.end < f.start);
+        if (bad){ toast('«Til» må være etter «Fra» for ' + (bad.name || 'stedet') + '.'); return; }
+        const clean = list.map(f => ({id:f.id, name:String(f.name || '').trim(), start: isoDate(f.start) ? f.start : '', end: isoDate(f.end) ? f.end : ''})).filter(f => f.name);
         if (await saveFolders(clean)){ sheet.close(); toast('Stedene er lagret'); }
       }}, 'Lagre'))
     );
@@ -727,30 +747,59 @@ function boardView(){
     : ((a.createdAt || 0) - (b.createdAt || 0)));
 
 
-  const seg = (id, label) => h('button', {'aria-pressed': String(S.filter === id), onclick:() => { S.filter = id; render(); }}, label);
-  const drops = S.canWrite && days.length ? h('div', {class:'drops'},
-    h('p', {class:'drops-label'}, 'Dra et kort hit for å legge det til en dag:'),
-    days.map(d => dropZone(d, dayLabel(d, true))), dropZone(null, 'Tilbake til tavla')) : null;
+  const inFolder = S.ideas.filter(i => !S.folder || i.folder === S.folder);
+  const nOpen = inFolder.filter(i => !planned(i)).length, nPlanned = inFolder.length - nOpen;
+  const seg = (id, label, n) => h('button', {'aria-pressed': String(S.filter === id), onclick:() => { S.filter = id; render(); }}, label, n != null ? h('small', null, ' ' + n) : null);
 
   const grid = list.length ? h('div', {class:'masonry'}, list.map(ideaCard)) : h('div', {class:'empty'},
     h('h3', null, S.ideas.length ? 'Ingen idéer her' : 'Tavla er tom'),
     h('p', null, S.folder ? 'Ingen idéer for ' + folderName(S.folder) + ' ennå. Trykk + for å feste den første.' : S.ideas.length ? 'Prøv et annet filter.' : 'Trykk + for å feste det første forslaget, for eksempel en kafé eller en dagstur.'));
 
-  const mode = (id, label) => h('button', {'aria-pressed': String(S.boardMode === id), onclick:() => { S.boardMode = id; render(); }}, label);
-  const bar = h('div', {class:'boardbar'},
-    h('div', {class:'boardrow'}, h('div', {class:'seg', role:'group', 'aria-label':'Visning'}, mode('tavle','Tavle'), mode('kart','Kart')),
-      S.canWrite && !folders.length ? h('button', {class:'folder-chip add bar-add', onclick:() => foldersSheet()}, '+ Del inn i steder') : null),
-    h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt'), seg('planned','Planlagt')));
-  const frow = folderRow(folders);
-  if (S.boardMode === 'kart') return [frow, bar, ...mapView(list)];
-  return [frow, bar, drops, grid];
+  const isMap = S.boardMode === 'kart';
+  const toolbar = h('div', {class:'boardtools'},
+    folderRow(folders),
+    h('div', {class:'boardrow'},
+      h('div', {class:'seg', role:'group', 'aria-label':'Filter'}, seg('all','Alle'), seg('open','Ikke planlagt', nOpen), seg('planned','Planlagt', nPlanned)),
+      h('button', {class:'viewtoggle', 'aria-pressed': String(isMap), 'aria-label': isMap ? 'Vis tavla' : 'Vis kart', title: isMap ? 'Tavle' : 'Kart',
+        onclick:() => { S.boardMode = isMap ? 'tavle' : 'kart'; render(); }}, h('span', {svg: isMap ? ICONS.grid : ICONS.map, style:'display:inline-flex'}))));
+  requestAnimationFrame(() => { const tabs = document.querySelector('.tabs'); if (tabs) toolbar.style.top = (tabs.getBoundingClientRect().height + 14) + 'px'; });
+  const sel = S.folder ? folders.find(f => f.id === S.folder) : null;
+  const leg = sel ? legCard(sel, inFolder.length) : null;
+  if (isMap) return [toolbar, leg, ...mapView(list)];
+  return [toolbar, leg, grid];
 }
 
+// Kort for valgt sted: bilde, datoer og antall idéer
+function legCard(f, n){
+  const w = wikiImage(f.wiki || ('en:' + f.name));
+  const days = folderDays(f);
+  const bits = [folderRange(f) ? folderRange(f) + ' ' + MONL[D(f.start).getUTCMonth()] : 'Ingen datoer', n + (n === 1 ? ' idé' : ' idéer')];
+  if (days.length) bits.push(days.length + (days.length === 1 ? ' dag' : ' dager'));
+  return h('div', {class:'legcard'},
+    h('span', {class:'legcard-img'}, w ? h('img', {src:w.src, alt:'', referrerpolicy:'no-referrer', onerror: e => e.target.remove()}) : null),
+    h('div', null, h('b', null, f.name), h('span', null, bits.join(' · '))),
+    S.canWrite && !days.length ? h('button', {class:'linkbtn', style:'margin-left:auto;font-size:13px', onclick:() => foldersSheet()}, 'Legg til datoer') : null);
+}
+// Skuff med dager som glir opp nederst mens man drar et kort
+let dragTray = null;
+function showDragTray(i){
+  hideDragTray();
+  if (!S.canWrite) return;
+  const days = daysFor(i);
+  if (!days.length) return;
+  const f = tripFolders().find(x => x.id === i.folder);
+  dragTray = h('div', {class:'dragtray', role:'region', 'aria-label':'Slipp på en dag'},
+    h('p', null, folderDays(f).length ? 'Slipp på en dag i ' + f.name : 'Slipp på en dag'),
+    h('div', {class:'dragtray-days'}, days.map(d => dropZone(d, dayLabel(d, true))), i.day ? dropZone(null, 'Tilbake til tavla') : null));
+  document.body.append(dragTray);
+  requestAnimationFrame(() => dragTray && dragTray.classList.add('open'));
+}
+function hideDragTray(){ if (dragTray){ const t = dragTray; dragTray = null; t.classList.remove('open'); setTimeout(() => t.remove(), 220); } }
 function dropZone(day, label){
   const el = h('button', {class:'drop', onclick:() => toast('Dra et idékort hit, eller velg dag på kortet.')}, label);
   el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
   el.addEventListener('dragleave', () => el.classList.remove('over'));
-  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('over'); const id = e.dataTransfer.getData('text/plain'); const i = S.ideas.find(x => x.id === id); if (i) moveIdea(i, day); });
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('over'); hideDragTray(); const id = e.dataTransfer.getData('text/plain'); const i = S.ideas.find(x => x.id === id); if (i) moveIdea(i, day); });
   return el;
 }
 
@@ -818,8 +867,8 @@ function ideaCard(i){
       h('span', null, planned ? 'Planlagt ' + dayLabel(i.day, true).toLowerCase() + (i.time ? ' kl. ' + i.time : '') : (i.addedBy ? 'Festet av ' + nameOf(i.addedBy) : 'Forslag fra Claude'))
     )
   );
-  el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', i.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
-  el.addEventListener('dragend', () => el.classList.remove('dragging'));
+  el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', i.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); setTimeout(() => showDragTray(i), 0); });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); hideDragTray(); });
   return el;
 }
 
@@ -846,7 +895,7 @@ function ideaDetail(id){
     heartBtn(i),
     h('div', {class:'section-label'}, planned ? 'Planlagt ' + dayLabel(i.day).toLowerCase() : 'Flytt inn på en dag'),
     days.length ? h('div', {class:'daychips', role:'group', 'aria-label':'Velg dag'},
-      days.map(d => h('button', {'aria-pressed': String(i.day === d), disabled: !S.canWrite, onclick:() => moveIdea(i, i.day === d ? null : d)}, dayLabel(d, true))),
+      [...new Set([...daysFor(i), ...(planned ? [i.day] : [])])].sort().map(d => h('button', {'aria-pressed': String(i.day === d), disabled: !S.canWrite, onclick:() => moveIdea(i, i.day === d ? null : d)}, dayLabel(d, true))),
       planned && S.canWrite ? h('button', {onclick:() => moveIdea(i, null)}, 'Tilbake til tavla') : null
     ) : h('p', {class:'muted'}, 'Legg inn datoer for turen først.'),
     planned ? h('div', {class:'field', style:'margin-top:12px'}, h('label', {for:'d-time'}, 'Klokkeslett (valgfritt)'), time) : null,
