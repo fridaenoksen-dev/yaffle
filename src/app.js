@@ -566,8 +566,9 @@ function prepList(){
   out.push({key:'ehic', title:'Europeisk helsetrygdkort', note:'Gratis på helsenorge.no. Gir rett til nødvendig helsehjelp i EU/EØS.', group:'Ordne'});
   out.push({key:'insurance', title:'Reiseforsikring', note:'Sjekk at den gjelder, ofte via bank eller kredittkort.', group:'Ordne'});
   const hidden = new Set((S.trip && S.trip.prepHidden) || []);
-  const extra = ((S.trip && S.trip.prepExtra) || []).map(x => ({key:'x-' + x.id, title:x.text, note:'', group:'Egne', own:true, id:x.id}));
-  return [...out.filter(t => !hidden.has(t.key)), ...extra];
+  const edits = (S.trip && S.trip.prepEdits) || {};
+  const extra = ((S.trip && S.trip.prepExtra) || []).map(x => ({key:'x-' + x.id, title:x.text, note:x.note || '', group:'Egne', own:true, id:x.id}));
+  return [...out.filter(t => !hidden.has(t.key)).map(t => edits[t.key] ? {...t, title: edits[t.key].title || t.title, note: edits[t.key].note != null ? edits[t.key].note : t.note, edited:true} : t), ...extra];
 }
 function prepDone(uid, key){ const d = S.prep[uid] && S.prep[uid].done; return !!(d && d[key]); }
 async function togglePrep(key){
@@ -591,11 +592,33 @@ function prepCard(){
     h('span', {class:'prepcard-go', 'aria-hidden':'true'}, '›'));
 }
 function prepSheet(){
+  let editing = null;
+  const saveEdit = async (t, title, note) => {
+    const tr = S.trip || {};
+    if (!title){ toast('Punktet må ha et navn.'); return; }
+    const patch = t.own
+      ? {prepExtra: (tr.prepExtra || []).map(x => x.id === t.id ? {...x, text:title, note} : x)}
+      : {prepEdits: {[t.key]: {title, note}}};
+    await write('trip/main', () => S.db.doc('trip/main').update(patch));
+    editing = null; draw();
+  };
   const draw = () => {
     const list = prepList();
     const ids = memberIds();
     const groups = ['Apper', 'Ordne', 'Egne'].map(g => [g, list.filter(t => t.group === g)]).filter(([, l]) => l.length);
     const row = t => {
+      if (editing === t.key){
+        const ti = h('input', {class:'input', value:t.title, maxlength:'80', 'aria-label':'Navn på punktet'});
+        const no = h('textarea', {class:'input', maxlength:'300', rows:'3', 'aria-label':'Beskrivelse', placeholder:'Beskrivelse (valgfritt)'}); no.value = t.note || '';
+        setTimeout(() => ti.focus(), 30);
+        ti.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveEdit(t, ti.value.trim(), no.value.trim()); } });
+        return h('div', {class:'prep-row editing'}, h('div', {class:'prep-body', style:'display:grid;gap:8px'}, ti, no,
+          h('div', {style:'display:flex;gap:8px;justify-content:flex-end;align-items:center'},
+            t.edited ? h('button', {class:'linkbtn', type:'button', style:'margin-right:auto;font-size:13px', onclick: async () => {
+              await write('trip/main', () => S.db.doc('trip/main').update({prepEdits: {[t.key]: null}})); editing = null; draw(); }}, 'Tilbake til forslaget') : null,
+            h('button', {class:'btn ghost', type:'button', onclick:() => { editing = null; draw(); }}, 'Avbryt'),
+            h('button', {class:'btn primary', type:'button', onclick:() => saveEdit(t, ti.value.trim(), no.value.trim())}, 'Lagre'))));
+      }
       const done = prepDone(S.me, t.key);
       const who = ids.filter(id => prepDone(id, t.key));
       let armed = false;
@@ -608,7 +631,7 @@ function prepSheet(){
       }}, '×') : null;
       return h('div', {class:'prep-row' + (done ? ' on' : '')},
         h('button', {class:'prep-check', role:'checkbox', 'aria-checked': String(done), 'aria-label': t.title, onclick: async () => { await togglePrep(t.key); draw(); }}, done ? '✓' : ''),
-        h('div', {class:'prep-body'}, h('b', null, t.title), t.note ? h('p', null, t.note) : null,
+        h('div', {class:'prep-body'}, S.canWrite ? h('button', {class:'prep-title', type:'button', title:'Endre', onclick:() => { editing = t.key; draw(); }}, t.title, h('span', {class:'prep-edit', 'aria-hidden':'true'}, 'Endre')) : h('b', null, t.title), t.note ? h('p', null, t.note) : null,
           ids.length > 1 ? h('div', {class:'prep-who'}, who.length ? h('span', {class:'faces'}, who.map(id => face(id, true))) : null, h('small', null, !who.length ? 'Ingen har huket av ennå' : who.length === ids.length ? 'Alle har ordnet det' : who.map(nameOf).join(', '))) : null),
         rm);
     };

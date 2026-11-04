@@ -615,6 +615,11 @@ dialog.taxi .close{background:#0e0f0c;color:#fff}
 .prep-body{flex:1;min-width:0}
 .prep-body b{display:block;font-size:15px;color:var(--ink)}
 .prep-row.on .prep-body b{text-decoration:line-through;text-decoration-color:rgba(0,0,0,.35)}
+.prep-title{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;border:0;background:none;padding:0;font:inherit;font-weight:700;font-size:15px;color:var(--ink);cursor:pointer}
+.prep-edit{font-size:12px;font-weight:500;color:var(--muted);text-decoration:underline;text-underline-offset:2px;opacity:.8}
+.prep-row.on .prep-title{text-decoration:line-through;text-decoration-color:rgba(0,0,0,.35)}
+.prep-row.editing{background:var(--paper);box-shadow:0 0 0 1.5px var(--accent)}
+.prep-row.editing .input{background:var(--fog)}
 .prep-body p{margin:3px 0 0;font-size:13px;line-height:1.45;color:var(--text)}
 .prep-who{display:flex;align-items:center;gap:8px;margin-top:8px}
 .prep-who small{font-size:12px;color:var(--muted)}
@@ -706,6 +711,6 @@ dialog.sheet{border-radius:30px 30px 0 0}
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261104o"></script>
+<script type="module" src="./src/runtime.js?v=20261104p"></script>
 </body>
 </html>
