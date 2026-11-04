@@ -250,7 +250,7 @@ function view(){
 
 function topBar(){
   return h('div', {class:'top'},
-    h('div', {class:'brand'}, h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
+    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); if (sheet.open) sheet.close(); S.view = 'plan'; S.boardMode = 'tavle'; try { history.replaceState(null, '', '#plan'); } catch(_){} render(); window.scrollTo({top:0, behavior:'smooth'}); const hs = document.getElementById('plan-scroll'); if (hs) hs.scrollTo({left:0}); }}, h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
     S.me ? h('button', {class:'mebtn', 'aria-label':'Din profil', onclick:() => meSheet()}, face(S.me)) : null
   );
 }
