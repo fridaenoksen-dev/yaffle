@@ -36,3 +36,9 @@ Favicon, app-ikoner og manifest ligger i rotmappen (`favicon.ico`, `favicon.svg`
 - Rutene er hull, ikke hvite felter: logoen viser bakgrunnen gjennom.
 
 Varemerke er ikke sjekket. Gjør et søk før logoen brukes kommersielt.
+
+## Alternativ: Veiskille (til testing)
+
+**Idé:** to veier møtes og blir én tur. Filene ligger i `brand/veiskille/`: symbol, liggende og stående versjon i grønn, svart og hvit, app-ikon og favicon.
+
+I appen: trykk på profilbildet ditt → **Logo (test)** → Veiskille. Valget lagres bare på enheten din og bytter logoen i toppen og ikonet i nettleserfanen. Ikonet på hjemskjermen følger manifestet og forblir Vaffelplan.

@@ -283,7 +283,7 @@ function view(){
 
 function topBar(){
   return h('div', {class:'top'},
-    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); goHome(); }}, h('span', {class:'brandmark', 'aria-hidden':'true', svg:'<svg viewBox="16 16 224 224"><path fill="currentColor" fill-rule="evenodd" d="M78.5 16 H177.5 C 208.5 16 240 47.5 240 78.5 V177.5 C 240 208.5 208.5 240 177.5 240 H78.5 C 47.5 240 16 208.5 16 177.5 V78.5 C 16 47.5 47.5 16 78.5 16 Z M60.0 42.0 H98.0 A18 18 0 0 1 116.0 60.0 V98.0 A18 18 0 0 1 98.0 116.0 H60.0 A18 18 0 0 1 42.0 98.0 V60.0 A18 18 0 0 1 60.0 42.0 Z M158.0 42.0 H196.0 A18 18 0 0 1 214.0 60.0 V98.0 A18 18 0 0 1 196.0 116.0 H158.0 A18 18 0 0 1 140.0 98.0 V60.0 A18 18 0 0 1 158.0 42.0 Z M60.0 140.0 H98.0 A18 18 0 0 1 116.0 158.0 V196.0 A18 18 0 0 1 98.0 214.0 H60.0 A18 18 0 0 1 42.0 196.0 V158.0 A18 18 0 0 1 60.0 140.0 Z M177.0 214.0 C 147.0 194.0 135.0 174.0 137.0 158.0 C 139.0 142.0 153.0 134.0 163.0 134.0 C 171.0 134.0 175.0 140.0 177.0 146.0 C 179.0 140.0 183.0 134.0 191.0 134.0 C 201.0 134.0 215.0 142.0 217.0 158.0 C 219.0 174.0 207.0 194.0 177.0 214.0 Z"/></svg>'}), h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
+    h('a', {class:'brand', href:'#plan', 'aria-label':'Yaffle, til forsiden', onclick: e => { e.preventDefault(); goHome(); }}, h('span', {class:'brandmark', 'aria-hidden':'true', svg: window.yaffleLogo ? window.yaffleLogo.svg() : ''}), h('b', null, 'Yaffle'), h('i', null, 'Yay, waffles.')),
     S.me ? h('button', {class:'mebtn', 'aria-label':'Din profil', onclick:() => meSheet()}, face(S.me)) : null
   );
 }
@@ -342,6 +342,10 @@ function meSheet(){
       if (ok) toast('Navnet er lagret');
     }}, field('Navn', 'me-nick', nick), h('div', {class:'actions'}, h('span'), h('button', {class:'btn primary', type:'submit'}, 'Lagre navn'))),
     S.canWrite && S.trip ? h('button', {class:'btn ghost', type:'button', style:'margin-top:12px', onclick:() => tripSheet()}, 'Endre turen (navn og datoer)') : null,
+    window.yaffleLogo ? h('div', {class:'field', style:'margin-top:18px'}, h('label', null, 'Logo (test)'),
+      h('div', {class:'seg', role:'group', 'aria-label':'Velg logo'}, window.yaffleLogo.list.map(l => h('button', {type:'button', 'aria-pressed': String(window.yaffleLogo.current() === l.id),
+        onclick: e => { window.yaffleLogo.set(l.id); e.currentTarget.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); render(); toast('Logoen er byttet på denne enheten'); }}, l.label))),
+      h('p', {class:'muted', style:'margin:6px 0 0;font-size:13px'}, 'Bytter logo i appen og fanen bare for deg, så du kan teste.')) : null,
     h('div', {class:'me-links'},
       window.yaffleChangePassword ? h('button', {class:'btn ghost', type:'button', onclick:() => { sheet.close(); window.yaffleChangePassword(); }}, 'Bytt passord') : null,
       window.yaffleSignOut ? h('button', {class:'btn danger', type:'button', onclick:() => window.yaffleSignOut()}, 'Logg ut') : null)
