@@ -760,12 +760,74 @@ html,body{overflow-x:clip}
 .linkstatus{margin:6px 0 0;font-size:13px;min-height:0}
 .linkstatus:empty{display:none}
 .cardlink{display:inline-block;margin-top:6px;font-size:14px;font-weight:600;color:var(--accent);text-decoration:none}
+
+/* ---------- treff, venner, chat ---------- */
+.homeactions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.homeact{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:10px 16px;background:var(--paper);box-shadow:0 0 0 1px var(--line);font:600 15px var(--body);color:var(--ink);cursor:pointer}
+.homeact b{font-size:18px;line-height:1}
+.homeact.primary{background:var(--accent);color:#fff;box-shadow:none}
+.treffcard{background:var(--paper);border-radius:22px;padding:16px;box-shadow:var(--glow);cursor:pointer;text-align:left;display:grid;gap:4px}
+.treffcard:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.treff-k{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b31}
+.treff-t{font-family:var(--display);font-size:26px;line-height:1.1;color:var(--ink)}
+.treff-m{font-size:14px;color:var(--muted)}
+.treff-who{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:6px}
+.treff-who .faces .face{width:24px;height:24px;font-size:11px}
+.rsvp{display:flex;gap:6px;margin-top:10px}
+.rsvp button{flex:1;border:0;border-radius:999px;padding:10px 6px;background:#f3e9de;color:#402011;font:600 14px var(--body);cursor:pointer;min-height:44px}
+.rsvp button[aria-pressed="true"].rsvp-yes{background:#e6eedb;color:#3f5a26;box-shadow:inset 0 0 0 1.5px #5b7f36}
+.rsvp button[aria-pressed="true"].rsvp-maybe{background:#fbefcc;color:#6b4a0c;box-shadow:inset 0 0 0 1.5px #d39a2a}
+.rsvp button[aria-pressed="true"].rsvp-no{background:#fbe3e8;color:#a3173f;box-shadow:inset 0 0 0 1.5px #d1255c}
+.treff-info p{margin:0 0 6px}
+.sheet-sub{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a4b31;margin:20px 0 8px}
+.who-group h3{font-size:13px;margin:14px 0 6px;color:var(--muted);font-weight:600}
+.who-list{display:flex;flex-wrap:wrap;gap:8px}
+.who-item{display:inline-flex;align-items:center;gap:6px;background:var(--fog);border-radius:999px;padding:4px 10px 4px 4px;font-size:14px}
+.treff-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.people{display:grid;gap:2px;background:var(--paper);border-radius:16px;box-shadow:0 0 0 1px var(--line);padding:4px 12px}
+.person{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.person:last-child{border:0}
+.person .face{width:36px;height:36px;font-size:15px;flex:none}
+.person-n{flex:1;min-width:0}
+.star{border:0;background:none;font-size:22px;line-height:1;color:#d7cbbd;cursor:pointer;width:40px;height:40px}
+.star.on{color:#faae33}
+.iconlink{border:0;background:none;color:var(--muted);font:600 14px var(--body);cursor:pointer;min-width:40px;height:40px}
+.btn.sm{padding:8px 14px;font-size:14px}
+.groupcard{display:grid;gap:2px;width:100%;text-align:left;border:0;background:var(--paper);box-shadow:0 0 0 1px var(--line);border-radius:16px;padding:12px 14px;margin-bottom:8px;cursor:pointer;font:inherit;color:var(--ink)}
+.groupcard span{font-size:13px;color:var(--muted)}
+.pick{display:flex;flex-wrap:wrap;gap:8px}
+.pickchip{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:5px 12px 5px 5px;background:var(--paper);box-shadow:0 0 0 1px var(--line);font:600 14px var(--body);color:var(--ink);cursor:pointer;min-height:40px}
+.pickchip .face{width:28px;height:28px;font-size:12px}
+.pickchip.group{padding:5px 14px;background:#f3e9de}
+.pickchip[aria-pressed="true"]{background:#402011;color:#faae33;box-shadow:none}
+.cal-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.cal-btns a{text-decoration:none}
+.chatbtn{display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:0}
+.chatmini{margin-left:auto;background:#f3e9de;color:#402011;border-radius:999px;padding:6px 10px;font:600 13px var(--body)}
+.chatbadge{background:#d1255c;color:#fff;border-radius:999px;font-size:11px;min-width:18px;height:18px;display:inline-grid;place-items:center;padding:0 5px}
+.chatbox{display:grid;gap:10px}
+.chatlist{max-height:min(52vh,460px);overflow-y:auto;display:grid;gap:4px;padding:6px 2px;background:#fbf6f0;border-radius:18px;padding:12px}
+.chat-empty{margin:20px auto;text-align:center}
+.msg{display:flex;gap:8px;align-items:flex-end}
+.msg.head{margin-top:8px}
+.msg .face{width:28px;height:28px;font-size:12px;flex:none}
+.msg-gap{width:28px;flex:none}
+.msg-body{max-width:78%;display:grid;gap:2px}
+.msg-meta{font-size:12px;color:var(--muted);padding:0 6px}
+.bubble{background:var(--paper);box-shadow:0 0 0 1px var(--line);border-radius:18px 18px 18px 6px;padding:8px 12px;font-size:15px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.msg.mine{justify-content:flex-end}
+.msg.mine .msg-gap{display:none}
+.msg.mine .msg-body{justify-items:end}
+.msg.mine .bubble{background:#402011;color:#fff3e0;box-shadow:none;border-radius:18px 18px 6px 18px}
+.chatform{display:flex;gap:8px;align-items:flex-end}
+textarea.input.chatinput{flex:1;resize:none;height:44px;min-height:44px;max-height:140px;padding-top:11px;padding-bottom:11px;line-height:1.35}
+.chatsend{flex:none;min-height:44px}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261111a"></script>
+<script type="module" src="./src/runtime.js?v=20261111b"></script>
 </body>
 </html>

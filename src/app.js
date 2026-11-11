@@ -38,6 +38,7 @@ const ICONS = {
   train:'<svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 11h12"/><circle cx="9" cy="14" r=".8"/><circle cx="15" cy="14" r=".8"/><path d="m8 21 2-4M16 21l-2-4"/></svg>',
   moon:'<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
   clip:'<svg viewBox="0 0 24 24"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3L15 7.5"/></svg>',
+  chat:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>',
   plus:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   map:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
   grid:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/></svg>'
@@ -84,7 +85,7 @@ const S = {
   packing:[], personal:{}, prep:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
   view: (h => h === 'papirer' ? 'penger' : ['plan','ideer','pakk','penger','hjem'].includes(h) ? h : 'plan')(location.hash.slice(1)),
   tripId: null, trips:[], profileDocs:{}, memberDocs:{}, tripMembers:{}, homeTab:'next',
-  filter:'all', boardMode:'tavle', pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
+  filter:'all', boardMode:'tavle', rsvp:{}, chat:{}, chatSubs:{}, friends:null, groups:null, pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
 
@@ -169,6 +170,7 @@ render();
     for (const t of S.trips) if (!(t.id in S.tripMembers)){
       S.tripMembers[t.id] = [];
       db.collection('trips/' + t.id + '/members').onSnapshot(m => { S.tripMembers[t.id] = m.docs.map(d => d.id); render(); }, () => {});
+      if (isTreff(t)) db.collection('trips/' + t.id + '/rsvp').onSnapshot(r => { S.rsvp[t.id] = Object.fromEntries(r.docs.map(d => [d.id, (d.data() || {}).answer])); render(); }, () => {});
     }
     S.loaded.trips = true; render();
   }, () => { S.loaded.trips = true; render(); });
@@ -179,7 +181,12 @@ render();
   S.db = { doc: p => p === 'trip/main' ? db.doc('trips/' + S.tripId) : db.doc(base + p), collection: p => db.collection(base + p) };
   window.yaffleTrip = S.tripId;
 
-  S.db.doc('trip/main').onSnapshot(s => { S.trip = s.exists ? s.data() : null; done('trip', s); render(); }, onErr('trip'));
+  S.db.doc('trip/main').onSnapshot(s => {
+    S.trip = s.exists ? s.data() : null; done('trip', s);
+    // Et treff har ingen egen planside: vis forsiden og åpne treffet
+    if (isTreff(S.trip) && !S.treffOpened){ S.treffOpened = true; S.view = 'hjem'; try { localStorage.removeItem('yaffle-trip'); } catch(_){} const id = S.tripId; setTimeout(() => treffSheet(id), 300); }
+    render();
+  }, onErr('trip'));
   S.db.collection('items').onSnapshot(s => { S.items = s.docs.map(d => ({id:d.id, ...d.data()})); done('items', s); render(); }, onErr('items'));
   S.db.collection('ideas').onSnapshot(s => {
     S.ideas = s.docs.map(d => ({id:d.id, ...d.data()}));
@@ -378,6 +385,8 @@ function meSheet(){
       h('div', {class:'seg', role:'group', 'aria-label':'Velg logo'}, window.yaffleLogo.list.map(l => h('button', {type:'button', 'aria-pressed': String(window.yaffleLogo.current() === l.id),
         onclick: e => { window.yaffleLogo.set(l.id); e.currentTarget.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); render(); toast('Logoen er byttet på denne enheten'); }}, l.label))),
       h('p', {class:'muted', style:'margin:6px 0 0;font-size:13px'}, 'Bytter logo i appen og fanen bare for deg, så du kan teste.')) : null,
+    h('div', {class:'field', style:'margin-top:18px'}, h('label', null, 'Kalender'),
+      h('button', {class:'btn ghost', type:'button', onclick:() => calendarSheet()}, 'Vis Yaffle i kalenderen min')),
     h('div', {class:'me-links'},
       window.yaffleChangePassword ? h('button', {class:'btn ghost', type:'button', onclick:() => { sheet.close(); window.yaffleChangePassword(); }}, 'Bytt passord') : null,
       window.yaffleSignOut ? h('button', {class:'btn danger', type:'button', onclick:() => window.yaffleSignOut()}, 'Logg ut') : null)
@@ -409,6 +418,7 @@ function hero(){
       h('span', {class:'countpill' + (cd.live ? ' live' : '')}, cd.pill),
       nights > 0 ? h('span', {class:'hd-nights'}, nights + (nights === 1 ? ' natt' : ' netter')) : null,
       cd.daysTo != null && cd.daysTo <= 5 && cd.daysTo >= 0 && packLeft() ? h('button', {class:'countpill todo', onclick:() => go('pakk')}, packLeft() + ' igjen å pakke') : null,
+      S.tripId ? chatButton(S.tripId, t.title) : null,
       ids.length ? h('button', {class:'stack-btn', 'aria-label':'Se gjengen', onclick:() => crewSheet()},
         h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true)))) : null)
   );
@@ -1719,15 +1729,21 @@ function isPast(t){
   return D(t.end || t.start) < today;
 }
 function homeView(){
-  const next = S.trips.filter(t => !isPast(t)).sort((a, b) => String(a.start || '9999') < String(b.start || '9999') ? -1 : 1);
+  const when = t => String(t.start || '9999') + (t.time || '');
+  const next = S.trips.filter(t => !isPast(t)).sort((a, b) => when(a) < when(b) ? -1 : 1);
   const past = S.trips.filter(isPast).sort((a, b) => String(a.start) > String(b.start) ? -1 : 1);
   const list = S.homeTab === 'past' ? past : next;
   const tab = (id, label) => h('button', {class:'tab', role:'tab', 'aria-selected': String(S.homeTab === id), onclick:() => { S.homeTab = id; render(); }}, label);
   if (!S.loaded.trips) return [h('p', {class:'muted', style:'margin-top:60px'}, 'Henter turene dine …')];
   return [
-    h('nav', {class:'tabs', role:'tablist', 'aria-label':'Turer', style:'margin-top:26px'}, tab('next', 'Kommende'), tab('past', 'Tidligere')),
+    h('nav', {class:'tabs', role:'tablist', 'aria-label':'Turer og treff', style:'margin-top:26px'}, tab('next', 'Kommende'), tab('past', 'Tidligere')),
+    h('div', {class:'homeactions'},
+      h('button', {type:'button', class:'homeact primary', onclick:() => treffForm(null)}, h('b', null, '+'), 'Nytt treff'),
+      h('button', {type:'button', class:'homeact', onclick:() => newTripSheet()}, h('b', null, '+'), 'Ny tur'),
+      h('button', {type:'button', class:'homeact', onclick:() => friendsSheet()}, 'Venner')),
     h('div', {class:'trips'},
       list.map(t => {
+        if (isTreff(t)) return treffCard(t);
         const ids = S.tripMembers[t.id] || [];
         const cover = tripCover(t);
         return h('button', {class:'tripcard' + (t.id === S.tripId ? ' current' : '') + (cover ? ' has-cover' : ''), onclick:() => openTrip(t.id)},
@@ -1736,7 +1752,7 @@ function homeView(){
           h('div', {class:'tripcard-title'}, t.title || 'Uten navn'),
           h('div', {class:'tripcard-foot'}, tripDates(t), ids.length ? h('span', {class:'faces'}, ids.slice(0, 5).map(id => face(id, true))) : null));
       }),
-      S.homeTab === 'next' ? h('button', {class:'addcard tripadd', onclick:() => newTripSheet()}, h('b', null, '+'), 'Ny tur') : null,
+      !list.length && S.homeTab === 'next' ? h('p', {class:'muted'}, 'Ingenting planlagt ennå. Lag et treff eller en tur.') : null,
       !list.length && S.homeTab === 'past' ? h('p', {class:'muted'}, 'Ingen tidligere turer ennå.') : null
     )
   ];
@@ -1776,6 +1792,330 @@ async function inviteSheet(reset){
       navigator.share ? h('button', {class:'btn ghost', onclick: () => navigator.share({title:'Bli med på ' + (S.trip && S.trip.title || 'tur') + ' i Yaffle', url}).catch(() => {})}, 'Del') : null),
     h('p', {class:'muted', style:'font-size:14px;margin-top:18px'}, 'Alle med lenken kan bli med. Har den kommet på avveie, lag en ny, så slutter den gamle å virke.'),
     h('button', {class:'linkbtn', onclick:() => inviteSheet(true)}, 'Lag ny lenke'));
+}
+
+/* ---------- treff, venner og gjenger ---------- */
+const isTreff = t => t && t.kind === 'treff';
+const RSVP = [['yes','Kommer'],['maybe','Kanskje'],['no','Kan ikke']];
+async function rpc(name, args){
+  const { data, error } = await window.yaffleRpc(name, args || {});
+  if (error){ if (/function|schema/i.test(error.message || '')) throw new Error('Venner og treff er ikke satt opp ennå (kjør venner-og-treff.sql i Supabase).'); throw new Error(error.message || 'Noe gikk galt'); }
+  return data;
+}
+function treffWhen(t, long){
+  if (!isoDate(t.start)) return 'Dato ikke satt';
+  const d = D(t.start);
+  const s = (long ? cap(WD[d.getUTCDay()]) : WD[d.getUTCDay()].slice(0, 3)) + ' ' + d.getUTCDate() + '. ' + (long ? MONL : MON)[d.getUTCMonth()];
+  return s + (t.time ? ' · ' + t.time : '');
+}
+function answersOf(tid){ return S.rsvp[tid] || {}; }
+function rsvpSummary(t){
+  const a = answersOf(t.id), ids = S.tripMembers[t.id] || [];
+  const n = k => ids.filter(id => a[id] === k).length;
+  const none = ids.filter(id => !a[id]).length;
+  return [n('yes') ? n('yes') + ' kommer' : null, n('maybe') ? n('maybe') + ' kanskje' : null, n('no') ? n('no') + ' kan ikke' : null, none ? none + ' har ikke svart' : null].filter(Boolean).join(' · ') || 'Ingen har svart ennå';
+}
+async function setRsvp(t, ans){
+  if (!S.me || !S.rdb) return;
+  const prev = answersOf(t.id)[S.me];
+  S.rsvp[t.id] = {...answersOf(t.id), [S.me]: ans}; render();
+  try { await S.rdb.doc('trips/' + t.id + '/rsvp/' + S.me).set({answer: ans, at: Date.now()}); toast(ans === 'yes' ? 'Du kommer!' : ans === 'maybe' ? 'Svart: kanskje' : 'Svart: kan ikke'); }
+  catch(e){ S.rsvp[t.id] = {...answersOf(t.id), [S.me]: prev}; render(); toast('Fikk ikke lagret svaret. Prøv igjen.'); }
+}
+function rsvpButtons(t){
+  const mine = answersOf(t.id)[S.me];
+  return h('div', {class:'rsvp', role:'group', 'aria-label':'Kommer du?'}, RSVP.map(([k, l]) =>
+    h('button', {type:'button', class:'rsvp-' + k, 'aria-pressed': String(mine === k), onclick: e => { e.stopPropagation(); setRsvp(t, k); }}, l)));
+}
+function treffCard(t){
+  const ids = S.tripMembers[t.id] || [], a = answersOf(t.id);
+  const coming = ids.filter(id => a[id] === 'yes');
+  return h('article', {class:'treffcard', tabindex:'0', role:'button', 'aria-label': (t.title || 'Treff') + ', ' + treffWhen(t, true),
+      onclick:() => treffSheet(t.id), onkeydown: e => { if (e.key === 'Enter') treffSheet(t.id); }},
+    h('div', {class:'treff-k'}, 'Treff · ' + treffWhen(t)),
+    h('div', {class:'treff-t'}, t.title || 'Treff'),
+    t.place ? h('div', {class:'treff-m'}, t.place) : null,
+    h('div', {class:'treff-who'}, coming.length ? h('span', {class:'faces'}, coming.slice(0, 6).map(id => face(id, true))) : null, h('span', null, rsvpSummary(t)), chatButton(t.id, t.title, 'chatmini')),
+    rsvpButtons(t));
+}
+function inviteLinkBox(tid, label){
+  const box = h('div', {class:'invitebox'}, h('button', {type:'button', class:'btn ghost', onclick: async () => {
+    try {
+      const code = await rpc('create_invite', {p_trip: tid});
+      const url = location.origin + location.pathname + '?bli-med=' + code;
+      if (navigator.share){ navigator.share({title: label, url}).catch(() => {}); }
+      else { await navigator.clipboard.writeText(url); toast('Lenken er kopiert'); }
+    } catch(e){ toast(e.message); }
+  }}, 'Del invitasjonslenke'));
+  return box;
+}
+function treffSheet(tid){
+  const t = S.trips.find(x => x.id === tid); if (!t) return;
+  const ids = S.tripMembers[t.id] || [], a = answersOf(t.id);
+  const group = (k, label) => { const list = ids.filter(id => k ? a[id] === k : !a[id]); return list.length ? h('div', {class:'who-group'}, h('h3', null, label + ' (' + list.length + ')'), h('div', {class:'who-list'}, list.map(id => h('span', {class:'who-item'}, face(id, true), nameOf(id))))) : null; };
+  openSheet(h('h2', null, t.title || 'Treff'),
+    h('div', {class:'treff-info'},
+      h('p', null, h('b', null, treffWhen(t, true))),
+      t.place ? h('p', null, safeUrl(t.mapUrl) ? h('a', {href:safeUrl(t.mapUrl), target:'_blank', rel:'noopener'}, t.place + ' ↗') : t.place) : null,
+      t.info ? h('p', {class:'muted'}, t.info) : null),
+    h('h3', {class:'sheet-sub'}, 'Kommer du?'), rsvpButtons(t),
+    group('yes', 'Kommer'), group('maybe', 'Kanskje'), group('no', 'Kan ikke'), group(null, 'Har ikke svart'),
+    h('div', {class:'treff-actions'},
+      h('button', {type:'button', class:'btn primary', onclick:() => pickPeopleSheet(t)}, 'Inviter flere'),
+      inviteLinkBox(t.id, 'Bli med: ' + (t.title || 'treff')),
+      h('button', {type:'button', class:'btn ghost', onclick:() => treffForm(t)}, 'Endre')),
+    h('h3', {class:'sheet-sub'}, 'Chat'), chatBox(t.id),
+    treffDanger(t));
+}
+function treffDanger(t){
+  const box = h('div', {class:'dangerzone'});
+  let armed = false;
+  const b = h('button', {type:'button', class:'btn danger', onclick: async () => {
+    if (!armed){ armed = true; b.textContent = 'Sikker? Trykk igjen'; setTimeout(() => { armed = false; b.textContent = label; }, 4000); return; }
+    try {
+      let owner = false; try { owner = !!(await rpc('is_trip_owner', {p_trip: t.id})); } catch(_){}
+      if (owner) await rpc('delete_trip', {p_trip: t.id}); else await rpc('leave_trip', {p_trip: t.id});
+      sheet.close(); toast(owner ? 'Treffet er slettet' : 'Du er ikke lenger med'); S.trips = S.trips.filter(x => x.id !== t.id); render();
+    } catch(e){ toast(e.message); }
+  }});
+  const label = t.createdBy === S.me ? 'Avlys treffet' : 'Ikke vis meg dette treffet';
+  b.textContent = label;
+  box.append(b);
+  return box;
+}
+
+/* venner */
+async function loadFriends(force){
+  if (S.friendsLoading || (S.friends && !force)) return S.friends;
+  S.friendsLoading = true;
+  try { S.friends = await rpc('my_friends'); } catch(e){ S.friends = S.friends || []; S.friendsError = e.message; }
+  try { S.groups = await rpc('my_groups'); } catch(e){ S.groups = S.groups || []; }
+  S.friendsLoading = false;
+  return S.friends;
+}
+function personFace(p){
+  if (p.photo){ const u = blobUrl(p.photo); if (u) return h('img', {class:'face', src:u, alt:''}); }
+  return h('span', {class:'face', style:'background:' + hashColor(p.id), 'aria-hidden':'true'}, (p.nick || '?').trim()[0].toUpperCase());
+}
+async function friendsSheet(){
+  openSheet(h('h2', null, 'Venner'), h('p', {class:'muted'}, 'Henter vennene dine …'));
+  await loadFriends(true);
+  const q = h('input', {class:'input', type:'search', placeholder:'Søk etter navn eller hel e-post', 'aria-label':'Søk etter venner', autocomplete:'off'});
+  const results = h('div');
+  const favBox = h('div'), allBox = h('div'), groupBox = h('div');
+  let timer = null;
+  const row = (p, mode) => {
+    let armed = false;
+    const rm = h('button', {type:'button', class:'iconlink', 'aria-label':'Fjern ' + p.nick + ' som venn', onclick: async () => {
+      if (!armed){ armed = true; rm.textContent = 'Fjern?'; setTimeout(() => { armed = false; rm.textContent = '×'; }, 3000); return; }
+      try { await rpc('remove_friend', {p_user: p.id}); await loadFriends(true); draw(); toast(p.nick + ' er fjernet'); } catch(e){ toast(e.message); }
+    }}, '×');
+    return h('div', {class:'person'}, personFace(p), h('span', {class:'person-n'}, h('b', null, p.nick || 'Uten navn')),
+      mode === 'search'
+        ? (p.is_friend ? h('span', {class:'pill ok'}, 'Venn') : h('button', {type:'button', class:'btn primary sm', onclick: async () => {
+            try { await rpc('add_friend', {p_user: p.id}); await loadFriends(true); p.is_friend = true; draw(); search(); toast(p.nick + ' er lagt til'); } catch(e){ toast(e.message); }
+          }}, 'Legg til'))
+        : [h('button', {type:'button', class:'star' + (p.favorite ? ' on' : ''), 'aria-pressed': String(!!p.favorite), 'aria-label':'Favoritt', onclick: async () => {
+            try { await rpc('set_favorite', {p_user: p.id, p_fav: !p.favorite}); p.favorite = !p.favorite; await loadFriends(true); draw(); } catch(e){ toast(e.message); }
+          }}, '★'), rm]);
+  };
+  const search = async () => {
+    const v = q.value.trim();
+    if (v.length < 2){ results.replaceChildren(); return; }
+    try {
+      const list = await rpc('search_users', {p_q: v});
+      results.replaceChildren(h('h3', {class:'sheet-sub'}, 'Treff på Yaffle'),
+        list.length ? h('div', {class:'people'}, list.map(p => row(p, 'search'))) : h('p', {class:'muted'}, 'Fant ingen. Har de ikke Yaffle ennå? Send dem en invitasjon under.'));
+    } catch(e){ results.replaceChildren(h('p', {class:'muted'}, e.message)); }
+  };
+  q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 300); });
+  const draw = () => {
+    const fr = S.friends || [];
+    const favs = fr.filter(p => p.favorite), rest = fr.filter(p => !p.favorite);
+    favBox.replaceChildren(h('h3', {class:'sheet-sub'}, 'Favoritter'), favs.length ? h('div', {class:'people'}, favs.map(p => row(p))) : h('p', {class:'muted'}, fr.length ? 'Trykk ★ på dem du planlegger mest med.' : ''));
+    allBox.replaceChildren(h('h3', {class:'sheet-sub'}, favs.length ? 'Alle andre venner' : 'Venner'), rest.length ? h('div', {class:'people'}, rest.map(p => row(p))) : h('p', {class:'muted'}, fr.length ? 'Alle vennene dine er favoritter.' : 'Ingen venner ennå. Søk dem opp over, eller del en lenke.'));
+    groupBox.replaceChildren(h('h3', {class:'sheet-sub'}, 'Gjenger'),
+      h('p', {class:'muted', style:'margin:0 0 8px;font-size:13px'}, 'Lagre faste grupper, så velger du alle med ett trykk når du lager et treff.'),
+      ...(S.groups || []).map(g => h('button', {type:'button', class:'groupcard', onclick:() => groupSheet(g)}, h('b', null, g.name), h('span', null, g.members.map(id => nameOf(id)).join(', ') || 'Ingen ennå'))),
+      h('button', {type:'button', class:'addcard', onclick:() => groupSheet(null)}, h('b', null, '+'), 'Ny gjeng'));
+  };
+  draw();
+  openSheet(h('h2', null, 'Venner'), q, results, favBox, allBox, groupBox,
+    h('div', {class:'invitebox', style:'margin-top:18px'}, h('button', {type:'button', class:'btn ghost', onclick: async () => {
+      const url = location.origin + location.pathname;
+      if (navigator.share) navigator.share({title:'Bli med i Yaffle', text:'Lag en bruker, så kan vi planlegge sammen.', url}).catch(() => {});
+      else { try { await navigator.clipboard.writeText(url); toast('Lenken er kopiert'); } catch(e){ toast(url); } }
+    }}, 'Inviter noen som ikke har Yaffle')));
+  setTimeout(() => q.focus(), 60);
+}
+function friendChips(selected, onChange){
+  const fr = S.friends || [];
+  const wrap = h('div', {class:'pick'});
+  const draw = () => {
+    wrap.replaceChildren(
+      ...(S.groups || []).filter(g => g.members.length).map(g => {
+        const on = g.members.every(id => selected.has(id));
+        return h('button', {type:'button', class:'pickchip group', 'aria-pressed': String(on), onclick:() => { g.members.forEach(id => on ? selected.delete(id) : selected.add(id)); draw(); onChange && onChange(); }}, g.name);
+      }),
+      ...fr.map(p => h('button', {type:'button', class:'pickchip', 'aria-pressed': String(selected.has(p.id)), onclick:() => { selected.has(p.id) ? selected.delete(p.id) : selected.add(p.id); draw(); onChange && onChange(); }},
+        personFace(p), (p.favorite ? '★ ' : '') + p.nick)));
+    if (!fr.length) wrap.append(h('p', {class:'muted', style:'margin:0'}, 'Du har ingen venner i Yaffle ennå. Legg dem til under Venner, eller del en invitasjonslenke etterpå.'));
+  };
+  draw();
+  return wrap;
+}
+async function groupSheet(g){
+  await loadFriends();
+  const name = h('input', {class:'input', value: g ? g.name : '', placeholder:'F.eks. Jentene', maxlength:'40'});
+  const sel = new Set(g ? g.members : []);
+  const form = h('form', {class:'form', onsubmit: async e => {
+    e.preventDefault(); if (!name.value.trim()) return name.focus();
+    try { await rpc('save_group', {p_id: g ? g.id : null, p_name: name.value.trim(), p_members: [...sel]}); await loadFriends(true); toast('Gjengen er lagret'); friendsSheet(); } catch(err){ toast(err.message); }
+  }},
+    field('Navn', 'g-name', name),
+    h('div', {class:'field'}, h('label', null, 'Hvem er med'), friendChips(sel)),
+    h('div', {class:'actions'},
+      g ? deleteBtn('Slett gjengen', async () => { try { await rpc('delete_group', {p_id: g.id}); await loadFriends(true); } catch(e){ toast(e.message); } setTimeout(friendsSheet, 50); }) : h('span'),
+      h('button', {class:'btn primary', type:'submit'}, 'Lagre')));
+  openSheet(h('h2', null, g ? 'Endre gjeng' : 'Ny gjeng'), form);
+}
+async function pickPeopleSheet(t){
+  await loadFriends(true);
+  const already = new Set(S.tripMembers[t.id] || []);
+  const sel = new Set();
+  const btn = h('button', {class:'btn primary', type:'button'}, 'Inviter');
+  const upd = () => { const n = [...sel].filter(id => !already.has(id)).length; btn.textContent = n ? 'Inviter ' + n : 'Velg hvem'; };
+  btn.onclick = async () => {
+    const ids = [...sel].filter(id => !already.has(id)); if (!ids.length) return;
+    try { await rpc('add_trip_members', {p_trip: t.id, p_users: ids}); toast('Invitert! De ser treffet neste gang de åpner Yaffle.'); refreshTripMembers(t.id); treffSheet(t.id); } catch(e){ toast(e.message); }
+  };
+  (S.friends || []).forEach(p => { if (already.has(p.id)) sel.add(p.id); });
+  openSheet(h('h2', null, 'Inviter flere'), friendChips(sel, upd), h('div', {class:'actions'}, h('span'), btn));
+  upd();
+}
+function refreshTripMembers(tid){
+  if (!S.rdb) return;
+  S.rdb.collection('trips/' + tid + '/members').get ? S.rdb.collection('trips/' + tid + '/members').get().then(m => { S.tripMembers[tid] = m.docs.map(d => d.id); render(); }).catch(() => {}) : null;
+}
+async function treffForm(t){
+  await loadFriends();
+  const today = new Date(); const iso = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  const title = h('input', {class:'input', value: t ? t.title || '' : '', placeholder:'F.eks. Middag hos Tara', maxlength:'60'});
+  const date = h('input', {class:'input', type:'date', value: t ? t.start || '' : '', min: t ? null : iso});
+  const time = h('input', {class:'input', type:'time', value: t ? t.time || '' : '19:00'});
+  const place = h('input', {class:'input', value: t ? t.place || '' : '', placeholder:'Hjemme hos noen, en restaurant …', maxlength:'120'});
+  const info = h('textarea', {class:'input', placeholder:'Ta med noe? Kleskode? Skriv det her.', maxlength:'600'}, t ? t.info || '' : '');
+  const sel = new Set();
+  const btn = h('button', {class:'btn primary', type:'submit'}, t ? 'Lagre' : 'Send invitasjon');
+  const upd = () => { if (!t) btn.textContent = sel.size ? 'Send til ' + sel.size + (sel.size === 1 ? ' venn' : ' venner') : 'Lag treffet'; };
+  const form = h('form', {class:'form', onsubmit: async e => {
+    e.preventDefault();
+    if (!title.value.trim()) return title.focus();
+    if (!date.value){ toast('Velg en dag.'); return date.focus(); }
+    btn.disabled = true;
+    const data = {kind:'treff', title:title.value.trim(), start:date.value, end:date.value, time:time.value || '', place:place.value.trim(), info:info.value.trim()};
+    try {
+      if (t){ await rpc('update_trip', {p_trip: t.id, p_data: data}); toast('Treffet er oppdatert'); treffSheet(t.id); return; }
+      const id = await rpc('create_trip', {p_title: data.title, p_note: '', p_start: data.start, p_end: data.end});
+      await rpc('update_trip', {p_trip: id, p_data: data});
+      if (sel.size) await rpc('add_trip_members', {p_trip: id, p_users: [...sel]});
+      try { await S.rdb.doc('trips/' + id + '/rsvp/' + S.me).set({answer:'yes', at: Date.now()}); } catch(_){}
+      sheet.close(); toast(sel.size ? 'Invitasjonen er sendt' : 'Treffet er laget. Inviter folk fra treffet.');
+    } catch(err){ toast(err.message); }
+    finally { btn.disabled = false; }
+  }},
+    field('Hva', 't-what', title),
+    h('div', {class:'row2'}, field('Dag', 't-day', date), field('Klokka', 't-time', time)),
+    field('Hvor', 't-where', place),
+    field('Info', 't-info', info),
+    t ? null : h('div', {class:'field'}, h('label', null, 'Hvem'), friendChips(sel, upd)),
+    h('div', {class:'actions'}, h('span'), btn));
+  openSheet(h('h2', null, t ? 'Endre treff' : 'Nytt treff'), form);
+  upd();
+}
+
+/* kalenderabonnement */
+async function calendarSheet(reset){
+  openSheet(h('h2', null, 'Yaffle i kalenderen'), h('p', {class:'muted'}, 'Lager lenken din …'));
+  let token;
+  try { token = await rpc('my_calendar_token', {p_reset: !!reset}); } catch(e){ openSheet(h('h2', null, 'Yaffle i kalenderen'), h('p', null, e.message)); return; }
+  const https = location.origin + '/api/kalender?t=' + token;
+  const webcal = https.replace(/^https?:/, 'webcal:');
+  const google = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal);
+  openSheet(h('h2', null, 'Yaffle i kalenderen'),
+    h('p', null, 'Abonner én gang, så dukker treff og turer du er med på opp i kalenderen din av seg selv. Endringer kommer automatisk. Treff du har sagt nei til, vises ikke.'),
+    h('div', {class:'cal-btns'},
+      h('a', {class:'btn primary', href: webcal}, 'iPhone / Mac-kalender'),
+      h('a', {class:'btn ghost', href: google, target:'_blank', rel:'noopener'}, 'Google Kalender'),
+      h('button', {type:'button', class:'btn ghost', onclick: async () => { try { await navigator.clipboard.writeText(https); toast('Lenken er kopiert'); } catch(e){ toast(https); } }}, 'Kopier lenke')),
+    h('p', {class:'muted', style:'font-size:13px;margin-top:14px'}, 'Lenken er personlig. Del den ikke. Har den kommet på avveie, lag en ny, så slutter den gamle å virke. Kalenderapper oppdaterer abonnementer noen ganger i timen, så nye treff kan bruke litt tid på å dukke opp.'),
+    h('button', {type:'button', class:'linkbtn', onclick:() => calendarSheet(true)}, 'Lag ny lenke'));
+}
+
+/* ---------- chat per treff og tur ---------- */
+const chatViews = {};   // tid -> funksjon som tegner åpen chat på nytt
+function chatSeen(tid){ try { return Number(localStorage.getItem('yaffle-chat-' + tid)) || 0; } catch(e){ return 0; } }
+function markChatSeen(tid){ const l = (S.chat[tid] || []).slice(-1)[0]; if (l) try { localStorage.setItem('yaffle-chat-' + tid, String(l.at || Date.now())); } catch(e){} }
+function unreadChat(tid){ const seen = chatSeen(tid); return (S.chat[tid] || []).filter(m => m.by !== S.me && (m.at || 0) > seen).length; }
+function subscribeChat(tid){
+  if (!S.rdb || S.chatSubs[tid]) return;
+  S.chatSubs[tid] = S.rdb.collection('trips/' + tid + '/chat').onSnapshot(s => {
+    S.chat[tid] = s.docs.map(d => ({id:d.id, ...d.data()})).sort((a, b) => (a.at || 0) - (b.at || 0));
+    if (chatViews[tid]) chatViews[tid](); else render();
+  }, () => {});
+}
+function chatTime(at){
+  const d = new Date(at || 0), now = new Date();
+  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  if (d.toDateString() === now.toDateString()) return hm;
+  return d.getDate() + '. ' + MON[d.getMonth()] + ' ' + hm;
+}
+function chatBox(tid){
+  subscribeChat(tid);
+  const list = h('div', {class:'chatlist', role:'log', 'aria-live':'polite', 'aria-label':'Meldinger'});
+  const inp = h('textarea', {class:'input chatinput', rows:'1', placeholder:'Skriv en melding …', maxlength:'1000', 'aria-label':'Melding'});
+  const send = h('button', {type:'submit', class:'btn primary chatsend', 'aria-label':'Send'}, 'Send');
+  const draw = () => {
+    if (!list.isConnected && list.dataset.drawn){ delete chatViews[tid]; render(); return; }
+    list.dataset.drawn = '1';
+    const msgs = S.chat[tid] || [];
+    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+    list.replaceChildren(...(msgs.length ? msgs.map((m, k) => {
+      const mine = m.by === S.me, prev = msgs[k - 1];
+      const head = !prev || prev.by !== m.by || (m.at - prev.at) > 10 * 60e3;
+      return h('div', {class:'msg' + (mine ? ' mine' : '') + (head ? ' head' : '')},
+        !mine && head ? face(m.by, true) : h('span', {class:'msg-gap'}),
+        h('div', {class:'msg-body'},
+          head ? h('div', {class:'msg-meta'}, mine ? 'Du' : nameOf(m.by), ' · ', chatTime(m.at)) : null,
+          h('div', {class:'bubble'}, m.text)));
+    }) : [h('p', {class:'muted chat-empty'}, 'Ingen meldinger ennå. Si hei!')]));
+    if (atBottom || !list.dataset.scrolled){ list.scrollTop = list.scrollHeight; list.dataset.scrolled = '1'; }
+    markChatSeen(tid);
+  };
+  chatViews[tid] = draw;
+  const grow = () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 140) + 'px'; };
+  inp.addEventListener('input', grow);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); form.requestSubmit(); } });
+  const form = h('form', {class:'chatform', onsubmit: async e => {
+    e.preventDefault();
+    const text = inp.value.trim(); if (!text || !S.rdb || !S.me) return;
+    inp.value = ''; grow(); send.disabled = true;
+    try { await S.rdb.collection('trips/' + tid + '/chat').doc().set({by: S.me, text, at: Date.now()}); }
+    catch(err){ inp.value = text; grow(); toast('Fikk ikke sendt meldingen. Prøv igjen.'); }
+    finally { send.disabled = false; inp.focus(); }
+  }}, inp, send);
+  const box = h('section', {class:'chatbox', 'aria-label':'Chat'}, list, form);
+  setTimeout(draw, 0);
+  return box;
+}
+function chatSheet(tid, title){
+  openSheet(h('h2', null, 'Chat' + (title ? ': ' + title : '')), chatBox(tid));
+}
+function chatButton(tid, title, cls){
+  subscribeChat(tid);
+  const n = unreadChat(tid);
+  return h('button', {type:'button', class:(cls || 'countpill') + ' chatbtn', 'aria-label': n ? 'Chat, ' + n + ' nye meldinger' : 'Chat', onclick: e => { e.stopPropagation(); chatSheet(tid, title); }},
+    h('span', {svg:ICONS.chat, style:'display:inline-flex'}), 'Chat', n ? h('b', {class:'chatbadge'}, n) : null);
 }
 
 /* ---------- onboarding ---------- */

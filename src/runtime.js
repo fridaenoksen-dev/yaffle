@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261111a";
+import * as CONFIG from "./config.js?v=20261111b";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
@@ -558,6 +558,7 @@ async function start(session) {
       app.replaceChildren(brand(), h("div", { class: "notice", style: "margin-top:40px" }, "Får ikke kontakt med databasen. Sjekk at migrate-flere-turer.sql er kjørt i Supabase."));
       return;
     }
+    if (tid) { try { await sb.rpc("befriend_trip", { p_trip: tid }); } catch (e) {} }
     if (tid) { try { localStorage.setItem("yaffle-trip", tid); } catch (e) {} history.replaceState(null, "", location.pathname + "?tur=" + encodeURIComponent(tid) + "#plan"); }
     else { history.replaceState(null, "", location.pathname); alert_msg = "Invitasjonslenken virker ikke lenger. Be om en ny."; }
   }
@@ -607,7 +608,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261111a");
+  await import("./app.js?v=20261111b");
 }
 
 const {
