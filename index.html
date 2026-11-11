@@ -822,12 +822,23 @@ html,body{overflow-x:clip}
 .chatform{display:flex;gap:8px;align-items:flex-end}
 textarea.input.chatinput{flex:1;resize:none;height:44px;min-height:44px;max-height:140px;padding-top:11px;padding-bottom:11px;line-height:1.35}
 .chatsend{flex:none;min-height:44px}
+.typegrid{display:grid;gap:10px}
+.typecard{display:flex;gap:14px;align-items:center;width:100%;text-align:left;border:0;background:var(--paper);box-shadow:0 0 0 1px var(--line);border-radius:18px;padding:14px;cursor:pointer;font:inherit;color:var(--ink)}
+.typecard:hover{box-shadow:0 0 0 1.5px var(--accent)}
+.typeicon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;background:#f3e9de;color:#6b2e12}
+.typeicon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.type-fest .typeicon{background:#fbefcc;color:#8a5a12}
+.type-arrangement .typeicon{background:#fbe3e8;color:#a3173f}
+.type-tur .typeicon{background:#402011;color:#faae33}
+.typetxt{display:grid;gap:2px}
+.typetxt b{font-size:17px}
+.typetxt span{font-size:14px;color:var(--muted);line-height:1.35}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261111b"></script>
+<script type="module" src="./src/runtime.js?v=20261111c"></script>
 </body>
 </html>

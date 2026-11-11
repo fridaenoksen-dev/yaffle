@@ -39,6 +39,8 @@ const ICONS = {
   moon:'<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
   clip:'<svg viewBox="0 0 24 24"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3L15 7.5"/></svg>',
   chat:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>',
+  cheers:'<svg viewBox="0 0 24 24"><path d="M8 3h5l-1 7a3 3 0 0 1-3 0L8 3zM10.5 10.5V18M8 18h5M14 6h5l-1 7a3 3 0 0 1-3 0"/><path d="M16.5 13.5V20M14 20h5"/></svg>',
+  gift:'<svg viewBox="0 0 24 24"><rect x="3.5" y="9" width="17" height="11" rx="2"/><path d="M3.5 13h17M12 9v11M12 9c-2-4-6-4-6-1.5S9.5 9 12 9zm0 0c2-4 6-4 6-1.5S14.5 9 12 9z"/></svg>',
   plus:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   map:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
   grid:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/></svg>'
@@ -1738,8 +1740,7 @@ function homeView(){
   return [
     h('nav', {class:'tabs', role:'tablist', 'aria-label':'Turer og treff', style:'margin-top:26px'}, tab('next', 'Kommende'), tab('past', 'Tidligere')),
     h('div', {class:'homeactions'},
-      h('button', {type:'button', class:'homeact primary', onclick:() => treffForm(null)}, h('b', null, '+'), 'Nytt treff'),
-      h('button', {type:'button', class:'homeact', onclick:() => newTripSheet()}, h('b', null, '+'), 'Ny tur'),
+      h('button', {type:'button', class:'homeact primary', onclick:() => createSheet()}, h('b', null, '+'), 'Lag noe nytt'),
       h('button', {type:'button', class:'homeact', onclick:() => friendsSheet()}, 'Venner')),
     h('div', {class:'trips'},
       list.map(t => {
@@ -1796,6 +1797,20 @@ async function inviteSheet(reset){
 
 /* ---------- treff, venner og gjenger ---------- */
 const isTreff = t => t && t.kind === 'treff';
+// Hva slags plan: alle unntatt tur lagres som treff med en undertype
+const PLAN_TYPES = [
+  {id:'treff', label:'Treff', icon:'chat', desc:'Middag, kaffe, tur i skogen. Dato, sted og Kommer-knapp.'},
+  {id:'fest', label:'Fest hjemme', icon:'cheers', desc:'Julebord, bursdag, vorspiel. Gjester svarer og dere avtaler i chatten.'},
+  {id:'arrangement', label:'Arrangement', icon:'gift', desc:'Utdrikningslag, babyshower. Planlegg sammen uten hovedpersonen.'},
+  {id:'tur', label:'Tur', icon:'flight', desc:'Reise med bookinger, idétavle, pakkeliste, kart og vær.'}
+];
+const planType = t => PLAN_TYPES.find(p => p.id === (t && t.sub)) || PLAN_TYPES[0];
+function createSheet(){
+  openSheet(h('h2', null, 'Hva vil du lage?'),
+    h('div', {class:'typegrid'}, PLAN_TYPES.map(p => h('button', {type:'button', class:'typecard type-' + p.id, onclick:() => p.id === 'tur' ? newTripSheet() : treffForm(null, p.id)},
+      h('span', {class:'typeicon', svg: ICONS[p.icon] || ICONS.other, 'aria-hidden':'true'}),
+      h('span', {class:'typetxt'}, h('b', null, p.label), h('span', null, p.desc))))));
+}
 const RSVP = [['yes','Kommer'],['maybe','Kanskje'],['no','Kan ikke']];
 async function rpc(name, args){
   const { data, error } = await window.yaffleRpc(name, args || {});
@@ -1832,7 +1847,7 @@ function treffCard(t){
   const coming = ids.filter(id => a[id] === 'yes');
   return h('article', {class:'treffcard', tabindex:'0', role:'button', 'aria-label': (t.title || 'Treff') + ', ' + treffWhen(t, true),
       onclick:() => treffSheet(t.id), onkeydown: e => { if (e.key === 'Enter') treffSheet(t.id); }},
-    h('div', {class:'treff-k'}, 'Treff · ' + treffWhen(t)),
+    h('div', {class:'treff-k'}, planType(t).label + ' · ' + treffWhen(t)),
     h('div', {class:'treff-t'}, t.title || 'Treff'),
     t.place ? h('div', {class:'treff-m'}, t.place) : null,
     h('div', {class:'treff-who'}, coming.length ? h('span', {class:'faces'}, coming.slice(0, 6).map(id => face(id, true))) : null, h('span', null, rsvpSummary(t)), chatButton(t.id, t.title, 'chatmini')),
@@ -1997,30 +2012,34 @@ function refreshTripMembers(tid){
   if (!S.rdb) return;
   S.rdb.collection('trips/' + tid + '/members').get ? S.rdb.collection('trips/' + tid + '/members').get().then(m => { S.tripMembers[tid] = m.docs.map(d => d.id); render(); }).catch(() => {}) : null;
 }
-async function treffForm(t){
+async function treffForm(t, sub){
+  sub = (t && t.sub) || sub || 'treff';
+  const pt = PLAN_TYPES.find(p => p.id === sub) || PLAN_TYPES[0];
   await loadFriends();
   const today = new Date(); const iso = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-  const title = h('input', {class:'input', value: t ? t.title || '' : '', placeholder:'F.eks. Middag hos Tara', maxlength:'60'});
+  const ph = {treff:'F.eks. Middag hos Tara', fest:'F.eks. Julebord hos Frida', arrangement:'F.eks. Utdrikningslag for Ida'}[sub];
+  const title = h('input', {class:'input', value: t ? t.title || '' : '', placeholder: ph, maxlength:'60'});
   const date = h('input', {class:'input', type:'date', value: t ? t.start || '' : '', min: t ? null : iso});
   const time = h('input', {class:'input', type:'time', value: t ? t.time || '' : '19:00'});
   const place = h('input', {class:'input', value: t ? t.place || '' : '', placeholder:'Hjemme hos noen, en restaurant …', maxlength:'120'});
   const info = h('textarea', {class:'input', placeholder:'Ta med noe? Kleskode? Skriv det her.', maxlength:'600'}, t ? t.info || '' : '');
   const sel = new Set();
   const btn = h('button', {class:'btn primary', type:'submit'}, t ? 'Lagre' : 'Send invitasjon');
-  const upd = () => { if (!t) btn.textContent = sel.size ? 'Send til ' + sel.size + (sel.size === 1 ? ' venn' : ' venner') : 'Lag treffet'; };
+  const noun = {treff:'treffet', fest:'festen', arrangement:'arrangementet'}[sub];
+  const upd = () => { if (!t) btn.textContent = sel.size ? 'Send til ' + sel.size + (sel.size === 1 ? ' venn' : ' venner') : 'Lag ' + noun; };
   const form = h('form', {class:'form', onsubmit: async e => {
     e.preventDefault();
     if (!title.value.trim()) return title.focus();
     if (!date.value){ toast('Velg en dag.'); return date.focus(); }
     btn.disabled = true;
-    const data = {kind:'treff', title:title.value.trim(), start:date.value, end:date.value, time:time.value || '', place:place.value.trim(), info:info.value.trim()};
+    const data = {kind:'treff', sub, title:title.value.trim(), start:date.value, end:date.value, time:time.value || '', place:place.value.trim(), info:info.value.trim()};
     try {
-      if (t){ await rpc('update_trip', {p_trip: t.id, p_data: data}); toast('Treffet er oppdatert'); treffSheet(t.id); return; }
+      if (t){ await rpc('update_trip', {p_trip: t.id, p_data: data}); toast('Lagret'); treffSheet(t.id); return; }
       const id = await rpc('create_trip', {p_title: data.title, p_note: '', p_start: data.start, p_end: data.end});
       await rpc('update_trip', {p_trip: id, p_data: data});
       if (sel.size) await rpc('add_trip_members', {p_trip: id, p_users: [...sel]});
       try { await S.rdb.doc('trips/' + id + '/rsvp/' + S.me).set({answer:'yes', at: Date.now()}); } catch(_){}
-      sheet.close(); toast(sel.size ? 'Invitasjonen er sendt' : 'Treffet er laget. Inviter folk fra treffet.');
+      sheet.close(); toast(sel.size ? 'Invitasjonen er sendt' : cap(noun) + ' er laget. Trykk på det for å invitere folk.');
     } catch(err){ toast(err.message); }
     finally { btn.disabled = false; }
   }},
@@ -2030,7 +2049,9 @@ async function treffForm(t){
     field('Info', 't-info', info),
     t ? null : h('div', {class:'field'}, h('label', null, 'Hvem'), friendChips(sel, upd)),
     h('div', {class:'actions'}, h('span'), btn));
-  openSheet(h('h2', null, t ? 'Endre treff' : 'Nytt treff'), form);
+  openSheet(h('h2', null, (t ? 'Endre ' : 'Ny' + (sub === 'treff' ? 'tt ' : ' ')) + pt.label.toLowerCase()),
+    sub === 'arrangement' && !t ? h('p', {class:'muted', style:'margin:-4px 0 12px;font-size:14px'}, 'Ikke inviter hovedpersonen, så er planleggingen hemmelig.') : null,
+    form);
   upd();
 }
 
