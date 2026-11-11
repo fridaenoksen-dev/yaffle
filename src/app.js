@@ -87,7 +87,7 @@ const S = {
   packing:[], personal:{}, prep:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
   view: (h => h === 'papirer' ? 'penger' : ['plan','ideer','pakk','penger','hjem'].includes(h) ? h : 'plan')(location.hash.slice(1)),
   tripId: null, trips:[], profileDocs:{}, memberDocs:{}, tripMembers:{}, homeTab:'next',
-  filter:'all', boardMode:'tavle', rsvp:{}, chat:{}, chatSubs:{}, friends:null, groups:null, pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
+  filter:'all', boardMode:'tavle', rsvp:{}, chat:{}, chatSubs:{}, bring:{}, friends:null, groups:null, pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
 
@@ -173,6 +173,7 @@ render();
       S.tripMembers[t.id] = [];
       db.collection('trips/' + t.id + '/members').onSnapshot(m => { S.tripMembers[t.id] = m.docs.map(d => d.id); render(); }, () => {});
       if (isTreff(t)) db.collection('trips/' + t.id + '/rsvp').onSnapshot(r => { S.rsvp[t.id] = Object.fromEntries(r.docs.map(d => [d.id, (d.data() || {}).answer])); render(); }, () => {});
+      if (isTreff(t)) db.collection('trips/' + t.id + '/bring').onSnapshot(r => { S.bring[t.id] = r.docs.map(d => ({id:d.id, ...d.data()})); if (bringViews[t.id]) bringViews[t.id](); render(); }, () => {});
     }
     S.loaded.trips = true; render();
   }, () => { S.loaded.trips = true; render(); });
@@ -1851,6 +1852,7 @@ function treffCard(t){
     h('div', {class:'treff-t'}, t.title || 'Treff'),
     t.place ? h('div', {class:'treff-m'}, t.place) : null,
     h('div', {class:'treff-who'}, coming.length ? h('span', {class:'faces'}, coming.slice(0, 6).map(id => face(id, true))) : null, h('span', null, rsvpSummary(t)), chatButton(t.id, t.title, 'chatmini')),
+    hasBring(t) && bringCount(t.id).all ? (c => h('div', {class:'bringprog'}, h('span', null, 'Hvem tar med hva: ' + c.taken + ' av ' + c.all + ' tatt'), h('span', {class:'bar'}, h('i', {style:'width:' + Math.round(c.taken / c.all * 100) + '%'})))) (bringCount(t.id)) : null,
     rsvpButtons(t));
 }
 function inviteLinkBox(tid, label){
@@ -1879,6 +1881,7 @@ function treffSheet(tid){
       h('button', {type:'button', class:'btn primary', onclick:() => pickPeopleSheet(t)}, 'Inviter flere'),
       inviteLinkBox(t.id, 'Bli med: ' + (t.title || 'treff')),
       h('button', {type:'button', class:'btn ghost', onclick:() => treffForm(t)}, 'Endre')),
+    hasBring(t) ? [h('h3', {class:'sheet-sub'}, 'Hvem tar med hva'), bringBox(t)] : null,
     h('h3', {class:'sheet-sub'}, 'Chat'), chatBox(t.id),
     treffDanger(t));
 }
@@ -2137,6 +2140,55 @@ function chatButton(tid, title, cls){
   const n = unreadChat(tid);
   return h('button', {type:'button', class:(cls || 'countpill') + ' chatbtn', 'aria-label': n ? 'Chat, ' + n + ' nye meldinger' : 'Chat', onclick: e => { e.stopPropagation(); chatSheet(tid, title); }},
     h('span', {svg:ICONS.chat, style:'display:inline-flex'}), 'Chat', n ? h('b', {class:'chatbadge'}, n) : null);
+}
+
+/* ---------- hvem tar med hva (fest og arrangement) ---------- */
+const bringViews = {};
+const hasBring = t => isTreff(t) && (t.sub === 'fest' || t.sub === 'arrangement' || (S.bring[t.id] || []).length);
+function bringCount(tid){ const l = S.bring[tid] || []; return {all: l.length, taken: l.filter(x => x.takenBy).length}; }
+function bringBox(t){
+  const tid = t.id;
+  const list = h('div', {class:'bringlist'});
+  const inp = h('input', {class:'input', placeholder:'F.eks. Dessert, isbiter, høyttaler …', maxlength:'80', 'aria-label':'Ny ting å ta med'});
+  const draw = () => {
+    if (!list.isConnected && list.dataset.drawn){ delete bringViews[tid]; return; }
+    list.dataset.drawn = '1';
+    const items = (S.bring[tid] || []).slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+    const c = bringCount(tid);
+    list.replaceChildren(
+      items.length ? h('p', {class:'bring-sum'}, c.taken + ' av ' + c.all + ' er tatt') : h('p', {class:'muted', style:'margin:0'}, 'Lag en liste over det som trengs, så kan folk huke av det de tar med.'),
+      ...items.map(it => {
+        const mine = it.takenBy === S.me, taken = !!it.takenBy;
+        let armed = false;
+        const del = (it.by === S.me || !it.by) ? h('button', {type:'button', class:'iconlink', 'aria-label':'Fjern ' + it.text, onclick: async () => {
+          if (!armed){ armed = true; del.textContent = 'Fjern?'; setTimeout(() => { armed = false; del.textContent = '×'; }, 3000); return; }
+          try { await S.rdb.doc('trips/' + tid + '/bring/' + it.id).delete(); } catch(e){ toast('Fikk ikke fjernet. Prøv igjen.'); }
+        }}, '×') : null;
+        return h('div', {class:'bringrow' + (taken ? ' taken' : '') + (mine ? ' mine' : '')},
+          h('button', {type:'button', class:'bringcheck', role:'checkbox', 'aria-checked': String(mine), disabled: taken && !mine,
+            'aria-label': mine ? 'Jeg tar ikke med ' + it.text + ' likevel' : 'Jeg tar med ' + it.text,
+            onclick: async () => {
+              if (taken && !mine) return;
+              try { await S.rdb.doc('trips/' + tid + '/bring/' + it.id).update({takenBy: mine ? null : S.me, takenAt: mine ? null : Date.now()}); }
+              catch(e){ toast('Fikk ikke lagret. Prøv igjen.'); }
+            }}, mine ? '✓' : ''),
+          h('div', {class:'bringtxt'}, h('b', null, it.text),
+            taken ? h('span', {class:'bringwho'}, face(it.takenBy, true), mine ? 'Du tar med' : nameOf(it.takenBy) + ' tar med') : h('span', {class:'bringfree'}, 'Ledig, trykk for å ta den')),
+          del);
+      }));
+  };
+  bringViews[tid] = draw;
+  const add = async () => {
+    const v = inp.value.trim(); if (!v) return inp.focus();
+    inp.value = '';
+    try { await S.rdb.collection('trips/' + tid + '/bring').doc().set({text: v, by: S.me, takenBy: null, at: Date.now()}); }
+    catch(e){ inp.value = v; toast('Fikk ikke lagt til. Prøv igjen.'); }
+    inp.focus();
+  };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
+  setTimeout(draw, 0);
+  return h('section', {class:'bringbox', 'aria-label':'Hvem tar med hva'}, list,
+    h('div', {class:'quickadd', style:'margin-top:10px'}, inp, h('button', {type:'button', class:'btn dark', onclick:add}, 'Legg til')));
 }
 
 /* ---------- onboarding ---------- */

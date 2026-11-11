@@ -833,12 +833,30 @@ textarea.input.chatinput{flex:1;resize:none;height:44px;min-height:44px;max-heig
 .typetxt{display:grid;gap:2px}
 .typetxt b{font-size:17px}
 .typetxt span{font-size:14px;color:var(--muted);line-height:1.35}
+.bringbox{display:grid}
+.bringlist{display:grid;gap:6px}
+.bring-sum{margin:0 0 4px;font-size:13px;font-weight:600;color:#7a4b31}
+.bringrow{display:flex;align-items:center;gap:12px;background:var(--paper);box-shadow:0 0 0 1px var(--line);border-radius:14px;padding:10px 8px 10px 12px}
+.bringrow.taken{background:#fbf6f0}
+.bringrow.mine{background:#eef4e6;box-shadow:0 0 0 1px #c9dcb3}
+.bringcheck{flex:none;width:30px;height:30px;border-radius:9px;border:2px solid #d9cfc4;background:var(--paper);color:#fff;font-weight:700;display:grid;place-items:center;cursor:pointer}
+.bringrow.mine .bringcheck{background:#5b7f36;border-color:#5b7f36}
+.bringrow.taken:not(.mine) .bringcheck{background:#e9e2d8;border-color:#e9e2d8;cursor:default}
+.bringtxt{flex:1;min-width:0;display:grid;gap:2px}
+.bringtxt b{font-size:15px;color:var(--ink)}
+.bringrow.taken:not(.mine) .bringtxt b{color:var(--muted)}
+.bringwho{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.bringwho .face{width:20px;height:20px;font-size:10px}
+.bringfree{font-size:13px;color:#9f531b}
+.bringprog{display:grid;gap:5px;margin-top:8px;font-size:13px;color:var(--muted)}
+.bringprog .bar{display:block;height:6px;background:#f3e9de;border-radius:9px;overflow:hidden}
+.bringprog .bar i{display:block;height:100%;background:#faae33}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261111c"></script>
+<script type="module" src="./src/runtime.js?v=20261111d"></script>
 </body>
 </html>
