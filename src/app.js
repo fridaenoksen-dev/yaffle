@@ -738,6 +738,7 @@ function itemCard(i){
       h('div', {class:'kicker'}, i.time ? h('span', {class:'time'}, i.time) : null, h('span', null, KIND_LABEL[kind] || 'Annet'), range ? h('span', null, range) : null),
       h('h3', null, i.title || 'Uten navn'),
       i.details ? h('p', {class:'details'}, i.details) : null,
+      safeUrl(i.link) ? h('a', {class:'cardlink', href:safeUrl(i.link), target:'_blank', rel:'noopener'}, 'Åpne lenke ↗') : null,
       (i.ref || cost) ? h('div', {class:'meta'},
         i.ref ? h('span', null, 'Ref ', h('button', {class:'refbtn', title:'Kopier', onclick: async () => { try { await navigator.clipboard.writeText(i.ref); toast('Kopiert: ' + i.ref); } catch(e){ toast('Kunne ikke kopiere. Ref: ' + i.ref); } }}, i.ref)) : null,
         cost ? h('span', null, h('b', null, cost), groupSize() > 1 ? ' · ' + money(Math.round(Number(i.cost) / groupSize()), i.currency) + ' hver' : '') : null
@@ -1437,6 +1438,39 @@ function lightbox(a){
       }) : null));
 }
 
+/* ---------- lim inn lenke: fyller ut navn, adresse, bilde og kartposisjon ---------- */
+// fields: {link, title, place, note, photoUrl}; returnerer funksjon som gir posisjonen som ble hentet (hvis adressen ikke er endret etterpå)
+function linkFetcher(fields){
+  let got = null;
+  const btn = h('button', {type:'button', class:'btn ghost linkfetch'}, 'Hent info');
+  const status = h('p', {class:'muted linkstatus', 'aria-live':'polite'});
+  const run = async () => {
+    const url = fields.link.value.trim();
+    if (!/^https?:\/\//i.test(url)){ status.textContent = 'Lim inn en hel lenke som starter med https://'; return; }
+    if (!window.yaffleLinkInfo){ status.textContent = 'Lenkehenting er ikke tilgjengelig her.'; return; }
+    btn.disabled = true; btn.textContent = 'Henter …'; status.textContent = '';
+    try {
+      const j = await window.yaffleLinkInfo(url);
+      const filled = [];
+      const fill = (el, v, label, force) => { if (el && v && (force || !el.value.trim())){ el.value = v; filled.push(label); } };
+      fill(fields.title, j.title, 'navn');
+      fill(fields.place, j.address || (j.source === 'google' ? j.title : ''), 'adresse');
+      fill(fields.note, j.description, fields.noteLabel || 'beskrivelse');
+      fill(fields.photoUrl, j.image, 'bilde');
+      if (j.lat != null && j.lng != null){ got = {lat:j.lat, lng:j.lng, place: fields.place ? fields.place.value.trim() : ''}; filled.push('kartposisjon'); }
+      status.textContent = j.partial ? (filled.length ? 'Siden stengte for oppslag, så bare navnet fra lenken ble fylt inn. Legg inn adressen selv.' : 'Siden stengte for oppslag. Fyll inn selv.') : filled.length ? 'Fylte inn ' + listNo(filled) + '. Se over før du lagrer.' : 'Fant ikke noe nytt å fylle inn. Feltene var allerede utfylt.';
+    } catch(e){ status.textContent = (e && e.message ? e.message : 'Fikk ikke hentet lenken') + '. Noen sider, som Booking.com og Instagram, stenger for dette.'; }
+    finally { btn.disabled = false; btn.textContent = 'Hent info'; }
+  };
+  btn.addEventListener('click', run);
+  fields.link.addEventListener('paste', () => setTimeout(() => { if (/^https?:\/\//i.test(fields.link.value.trim())) run(); }, 30));
+  const ui = h('div', {class:'field'}, h('label', {for: fields.link.id || null}, 'Lenke'),
+    h('div', {class:'linkrow'}, fields.link, btn), status,
+    h('p', {class:'muted', style:'margin:0;font-size:13px'}, 'Lim inn fra Google Maps («Del») eller nettsiden til stedet, så fylles navn, adresse og bilde ut.'));
+  return {ui, pos: () => got && (!fields.place || fields.place.value.trim() === got.place) ? {lat:got.lat, lng:got.lng} : null};
+}
+function listNo(a){ return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' og ' + a[a.length - 1]; }
+
 function itemSheet(item, day){
   const it = item || {kind:'flight', date: day || tripDays()[0] || '', booked:'yes', pay:'unknown', currency:'NOK'};
   let kind = it.kind || 'other';
@@ -1448,6 +1482,7 @@ function itemSheet(item, day){
   const details = h('textarea', {class:'input', placeholder:'Tider, adresse, hvem kjører …', maxlength:'1000'}, it.details || '');
   const ref = h('input', {class:'input', value: it.ref || '', placeholder:'Bookingnummer', maxlength:'60'});
   const place = h('input', {class:'input', value: it.place || '', placeholder:'Brukes til kartet', maxlength:'200'});
+  const link = h('input', {class:'input', id:'f-link', value: it.link || '', placeholder:'https://', maxlength:'600', inputmode:'url'});
   const cost = h('input', {class:'input', type:'number', inputmode:'decimal', min:'0', step:'1', value: it.cost != null && it.cost !== '' ? String(it.cost) : '', placeholder:'0'});
   const currency = h('select', {class:'input'}, Object.keys(CUR).map(c => h('option', {value:c, selected: (it.currency || 'NOK') === c}, c)));
   const booked = h('select', {class:'input'}, [['yes','Booket'],['no','Må bookes'],['na','Ikke relevant']].map(([v,l]) => h('option', {value:v, selected: (it.booked || 'yes') === v}, l)));
@@ -1457,12 +1492,15 @@ function itemSheet(item, day){
   const syncPaid = () => { paidByField.style.display = pay.value === 'paid' ? '' : 'none'; };
   pay.addEventListener('change', syncPaid); syncPaid();
 
+  const lf = linkFetcher({link, title, place, note: details, noteLabel:'detaljer'});
   const form = h('form', {class:'form', onsubmit: async e => {
     e.preventDefault();
     if (!title.value.trim()){ title.focus(); return; }
-    const data = {kind, title:title.value.trim(), date:date.value || '', endDate:endDate.value || '', time:time.value || '', details:details.value.trim(), ref:ref.value.trim(),
+    const data = {kind, link: link.value.trim(), title:title.value.trim(), date:date.value || '', endDate:endDate.value || '', time:time.value || '', details:details.value.trim(), ref:ref.value.trim(),
       cost: cost.value === '' ? null : Math.max(0, Number(cost.value) || 0), currency:currency.value, booked:booked.value, pay:pay.value, paidBy: pay.value === 'paid' ? (paidBy.value || null) : null, place: place.value.trim()};
-    if (data.place && (data.place !== (it.place || '') || !hasPos(it))){
+    const fetched = lf.pos();
+    if (fetched){ data.lat = fetched.lat; data.lng = fetched.lng; }
+    else if (data.place && (data.place !== (it.place || '') || !hasPos(it))){
       const pos = await geocode(data.place);
       if (pos){ data.lat = pos.lat; data.lng = pos.lng; } else toast('Fant ikke adressen på kartet. Prøv å skrive den mer nøyaktig.');
     }
@@ -1471,6 +1509,7 @@ function itemSheet(item, day){
     if (ok){ sheet.close(); toast(item ? 'Lagret' : 'Lagt til i planen'); }
   }},
     kindRow,
+    lf.ui,
     field('Hva', 'f-title', title),
     h('div', {class:'row2'}, field('Dato', 'f-date', date), field('Klokkeslett', 'f-time', time)),
     field(kind === 'stay' || kind === 'parking' ? 'Til og med' : 'Sluttdato (valgfritt)', 'f-end', endDate),
@@ -1492,7 +1531,7 @@ function ideaSheet(idea){
   const days = tripDays();
   const title = h('input', {class:'input', value:i.title || '', placeholder:'F.eks. Middag i gamlebyen', maxlength:'120'});
   const note = h('textarea', {class:'input', placeholder:'Hvorfor er dette gøy?', maxlength:'600'}, i.note || '');
-  const link = h('input', {class:'input', value:i.link || '', placeholder:'https://', maxlength:'400', inputmode:'url'});
+  const link = h('input', {class:'input', id:'i-link', value:i.link || '', placeholder:'https://', maxlength:'600', inputmode:'url'});
   let catVal = catOf(i.category)[0];
   const catRow = h('div', {class:'kinds', role:'group', 'aria-label':'Kategori'}, Object.entries(CATS).map(([k, c]) => h('button', {type:'button', 'aria-pressed': String(k === catVal), style: k === catVal ? '' : catStyle(c) + 'background:var(--c-bg);color:var(--c-ink)',
     onclick: e => { catVal = k; catRow.querySelectorAll('button').forEach(b => { const on = b === e.currentTarget; b.setAttribute('aria-pressed', String(on)); const cc = CATS[b.textContent]; b.style.cssText = on ? '' : catStyle(cc) + 'background:var(--c-bg);color:var(--c-ink)'; }); }}, k)));
@@ -1514,18 +1553,21 @@ function ideaSheet(idea){
   const place = h('input', {class:'input', value:i.place || '', placeholder:'F.eks. Targ Węglowy eller en adresse', maxlength:'200'});
   const flds = tripFolders();
   const folderSel = flds.length ? h('select', {class:'input'}, h('option', {value:''}, 'Ikke valgt'), flds.map(f => h('option', {value:f.id, selected: (idea ? i.folder : S.folder) === f.id}, f.name))) : null;
+  const lf = linkFetcher({link, title, place, note, photoUrl});
   const form = h('form', {class:'form', onsubmit: async e => {
     e.preventDefault();
     if (!title.value.trim()){ title.focus(); return; }
     const data = {title:title.value.trim(), note:note.value.trim(), link:link.value.trim(), category:catVal, photo: photo || null, photoUrl: photoUrl.value.trim(), wiki: parseWiki(photoUrl.value.trim()) || '', day: day.value || null, time: time.value || '', place: place.value.trim(), folder: folderSel ? (folderSel.value || null) : (i.folder || S.folder || null)};
-    if (data.place && (data.place !== (i.place || '') || !hasPos(i))){
+    const fetched = lf.pos();
+    if (fetched){ data.lat = fetched.lat; data.lng = fetched.lng; }
+    else if (data.place && (data.place !== (i.place || '') || !hasPos(i))){
       const pos = await geocode(data.place);
       if (pos){ data.lat = pos.lat; data.lng = pos.lng; } else toast('Fant ikke «' + data.place + '» på kartet. Prøv en mer nøyaktig adresse.');
     } else if (!data.place){ data.lat = null; data.lng = null; }
     if (idea){ const ok = await write('ideas/' + idea.id, () => S.db.doc('ideas/' + idea.id).update(data)); if (ok){ toast('Lagret'); ideaDetail(idea.id); } }
     else { sheet.close(); await addIdea(data); }
   }},
-    field('Idé', 'i-title', title), field('Notat', 'i-note', note), field('Lenke', 'i-link', link), h('div', {class:'field'}, h('label', null, 'Hva slags'), catRow),
+    lf.ui, field('Idé', 'i-title', title), field('Notat', 'i-note', note), h('div', {class:'field'}, h('label', null, 'Hva slags'), catRow),
     h('div', {class:'field'}, h('label', null, 'Bilde'), h('div', {class:'photo-pick'}, prev, S.assets ? photoLbl : h('span', {class:'muted', style:'font-size:14px'}, 'Bare redaktører kan laste opp bilder.'))),
     field('Eller bilde fra nett', 'i-photourl', photoUrl),
     h('p', {class:'muted', style:'margin:-6px 0 0;font-size:13px'}, 'Opplastet bilde vises først. En Wikipedia-lenke henter bildet fra artikkelen.'),

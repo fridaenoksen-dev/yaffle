@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261105g";
+import * as CONFIG from "./config.js?v=20261111a";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
@@ -565,6 +565,15 @@ async function start(session) {
   let nick = null; try { nick = sessionStorage.getItem("yaffle-nick"); sessionStorage.removeItem("yaffle-nick"); } catch (e) {}
   if (nick) { await sb.from("docs").upsert({ path: "profiles/" + session.user.id, collection: "profiles", data: { nick } }); }
   window.yaffleRpc = (name, args) => sb.rpc(name, args);
+  // Henter navn, adresse, bilde og koordinater fra en lenke via /api/lenke (krever innlogging)
+  window.yaffleLinkInfo = async (url) => {
+    const { data } = await sb.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    const r = await fetch("/api/lenke?url=" + encodeURIComponent(url), { headers: token ? { Authorization: "Bearer " + token } : {} });
+    let j = null; try { j = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error((j && j.error) || "Fikk ikke hentet lenken");
+    return j;
+  };
   // Fjerner alle opplastede filer for en tur (kvitteringer, bilder) før turen slettes.
   window.yaffleRemoveTripFiles = async (tid) => {
     const folder = String(tid).replace(/[^a-zA-Z0-9_-]/g, "");
@@ -598,7 +607,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261105g");
+  await import("./app.js?v=20261111a");
 }
 
 const {

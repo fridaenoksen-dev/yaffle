@@ -754,12 +754,18 @@ html,body{overflow-x:clip}
 .pill.ok .dot{background:#5b7f36!important}
 :root[data-theme="dark"] .pill.ok{background:#25331a!important;color:#b9d49a!important}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.ok{background:#25331a!important;color:#b9d49a!important}}
+.linkrow{display:flex;gap:8px;align-items:stretch}
+.linkrow .input{flex:1;min-width:0}
+.linkrow .linkfetch{flex:none;white-space:nowrap}
+.linkstatus{margin:6px 0 0;font-size:13px;min-height:0}
+.linkstatus:empty{display:none}
+.cardlink{display:inline-block;margin-top:6px;font-size:14px;font-weight:600;color:var(--accent);text-decoration:none}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261105g"></script>
+<script type="module" src="./src/runtime.js?v=20261111a"></script>
 </body>
 </html>
