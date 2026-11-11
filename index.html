@@ -850,12 +850,34 @@ textarea.input.chatinput{flex:1;resize:none;height:44px;min-height:44px;max-heig
 .bringprog{display:grid;gap:5px;margin-top:8px;font-size:13px;color:var(--muted)}
 .bringprog .bar{display:block;height:6px;background:#f3e9de;border-radius:9px;overflow:hidden}
 .bringprog .bar i{display:block;height:100%;background:#faae33}
+.thead{position:relative;display:grid;gap:6px;padding-right:64px;margin-bottom:14px}
+.thead h2{margin:0}
+.tfacts{display:grid;gap:6px;margin-top:4px}
+.tfact{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--ink)}
+.tfact svg{width:18px;height:18px;fill:none;stroke:#9f531b;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tfact a{color:var(--ink);text-decoration:underline;text-decoration-color:#d7c3ae;text-underline-offset:3px}
+.tedit{position:absolute;top:2px;right:0;border:0;background:#f3e9de;color:#402011;border-radius:999px;padding:7px 12px;font:600 13px var(--body);cursor:pointer}
+.ttabs{display:flex;gap:4px;background:#f3e9de;border-radius:999px;padding:4px;margin:0 0 16px;position:sticky;top:0;z-index:2}
+.ttabs button{flex:1;border:0;background:none;border-radius:999px;padding:9px 6px;font:600 14px var(--body);color:#6b4a35;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px}
+.ttabs button[aria-selected="true"]{background:#402011;color:#faae33}
+.tabbadge{font-size:11px;background:rgba(0,0,0,.08);border-radius:999px;padding:1px 7px}
+.ttabs button[aria-selected="true"] .tabbadge{background:rgba(250,174,51,.2)}
+.tinfo{display:grid;gap:12px}
+.tnote{margin:0;background:#fbf6f0;border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.45;white-space:pre-wrap}
+.tblock{background:var(--paper);box-shadow:0 0 0 1px var(--line);border-radius:18px;padding:14px}
+.tblock-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.tblock-head b{font-size:16px}
+.tblock .rsvp{margin-top:0}
+.who-rest{margin:10px 0 0;font-size:14px;color:var(--muted)}
+.who-rest span{font-weight:600;color:#7a4b31}
+.tfoot{display:grid;gap:4px;justify-items:start}
+.tfoot .dangerzone{margin-top:6px;padding-top:12px;border-top:0}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261111e"></script>
+<script type="module" src="./src/runtime.js?v=20261111f"></script>
 </body>
 </html>

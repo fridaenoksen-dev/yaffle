@@ -41,6 +41,8 @@ const ICONS = {
   chat:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>',
   cheers:'<svg viewBox="0 0 24 24"><path d="M8 3h5l-1 7a3 3 0 0 1-3 0L8 3zM10.5 10.5V18M8 18h5M14 6h5l-1 7a3 3 0 0 1-3 0"/><path d="M16.5 13.5V20M14 20h5"/></svg>',
   gift:'<svg viewBox="0 0 24 24"><rect x="3.5" y="9" width="17" height="11" rx="2"/><path d="M3.5 13h17M12 9v11M12 9c-2-4-6-4-6-1.5S9.5 9 12 9zm0 0c2-4 6-4 6-1.5S14.5 9 12 9z"/></svg>',
+  cal:'<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  pin:'<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
   plus:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   map:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
   grid:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="4" y="4" width="7" height="9" rx="2"/><rect x="13" y="4" width="7" height="5" rx="2"/><rect x="4" y="15" width="7" height="5" rx="2"/><rect x="13" y="11" width="7" height="9" rx="2"/></svg>'
@@ -1848,11 +1850,12 @@ function treffCard(t){
   const ids = S.tripMembers[t.id] || [], a = answersOf(t.id);
   const coming = ids.filter(id => a[id] === 'yes');
   return h('article', {class:'treffcard', tabindex:'0', role:'button', 'aria-label': (t.title || 'Treff') + ', ' + treffWhen(t, true),
-      onclick:() => treffSheet(t.id), onkeydown: e => { if (e.key === 'Enter') treffSheet(t.id); }},
+      onclick:() => treffSheet(t.id, 'info'), onkeydown: e => { if (e.key === 'Enter') treffSheet(t.id, 'info'); }},
     h('div', {class:'treff-k'}, planType(t).label + ' · ' + treffWhen(t)),
     h('div', {class:'treff-t'}, t.title || 'Treff'),
     t.place ? h('div', {class:'treff-m'}, t.place) : null,
-    h('div', {class:'treff-who'}, coming.length ? h('span', {class:'faces'}, coming.slice(0, 6).map(id => face(id, true))) : null, h('span', null, rsvpSummary(t)), chatButton(t.id, t.title, 'chatmini')),
+    h('div', {class:'treff-who'}, coming.length ? h('span', {class:'faces'}, coming.slice(0, 6).map(id => face(id, true))) : null, h('span', null, rsvpSummary(t)),
+      (n => h('button', {type:'button', class:'chatmini chatbtn', onclick: e => { e.stopPropagation(); treffSheet(t.id, 'chat'); }}, h('span', {svg:ICONS.chat, style:'display:inline-flex'}), 'Chat', n ? h('b', {class:'chatbadge'}, n) : null))((subscribeChat(t.id), unreadChat(t.id)))),
     hasBring(t) && bringCount(t.id).all ? (c => h('div', {class:'bringprog'}, h('span', null, c.taken + ' av ' + c.all + ' ting tatt'), h('span', {class:'bar'}, h('i', {style:'width:' + Math.round(c.taken / c.all * 100) + '%'})))) (bringCount(t.id)) : null,
     rsvpButtons(t));
 }
@@ -1867,24 +1870,42 @@ function inviteLinkBox(tid, label){
   }}, 'Del invitasjonslenke'));
   return box;
 }
-function treffSheet(tid){
+function treffSheet(tid, tab){
   const t = S.trips.find(x => x.id === tid); if (!t) return;
   const ids = S.tripMembers[t.id] || [], a = answersOf(t.id);
-  const group = (k, label) => { const list = ids.filter(id => k ? a[id] === k : !a[id]); return list.length ? h('div', {class:'who-group'}, h('h3', null, label + ' (' + list.length + ')'), h('div', {class:'who-list'}, list.map(id => h('span', {class:'who-item'}, face(id, true), nameOf(id))))) : null; };
-  openSheet(h('h2', null, t.title || 'Treff'),
-    h('div', {class:'treff-info'},
-      h('p', null, h('b', null, treffWhen(t, true))),
-      t.place ? h('p', null, safeUrl(t.mapUrl) ? h('a', {href:safeUrl(t.mapUrl), target:'_blank', rel:'noopener'}, t.place + ' ↗') : t.place) : null,
-      t.info ? h('p', {class:'muted'}, t.info) : null),
-    h('h3', {class:'sheet-sub'}, 'Kommer du?'), rsvpButtons(t),
-    group('yes', 'Kommer'), group('maybe', 'Kanskje'), group('no', 'Kan ikke'), group(null, 'Har ikke svart'),
-    h('div', {class:'treff-actions'},
-      h('button', {type:'button', class:'btn primary', onclick:() => pickPeopleSheet(t)}, 'Inviter flere'),
-      inviteLinkBox(t.id, 'Bli med: ' + (t.title || 'treff')),
-      h('button', {type:'button', class:'btn ghost', onclick:() => treffForm(t)}, 'Endre')),
-    hasBring(t) ? [h('h3', {class:'sheet-sub'}, 'Ta med'), bringBox(t)] : null,
-    h('h3', {class:'sheet-sub'}, 'Chat'), chatBox(t.id),
-    treffDanger(t));
+  const bring = hasBring(t);
+  tab = tab || S.treffTab || 'info';
+  if (tab === 'ta' && !bring) tab = 'info';
+  S.treffTab = tab;
+  const who = k => ids.filter(id => k ? a[id] === k : !a[id]);
+  const yes = who('yes');
+  const others = [['maybe', 'Kanskje'], ['no', 'Kan ikke'], [null, 'Ikke svart']].map(([k, l]) => [l, who(k)]).filter(([, l]) => l.length);
+  const bc = bringCount(t.id), unread = unreadChat(t.id);
+  const tabBtn = (id, label, badge) => h('button', {type:'button', role:'tab', 'aria-selected': String(tab === id), onclick:() => treffSheet(tid, id)}, label, badge ? h('b', {class:'tabbadge'}, badge) : null);
+  let body;
+  if (tab === 'chat') body = chatBox(t.id);
+  else if (tab === 'ta') body = bringBox(t);
+  else body = h('div', {class:'tinfo'},
+    t.info ? h('p', {class:'tnote'}, t.info) : null,
+    h('div', {class:'tblock'},
+      h('div', {class:'tblock-head'}, h('b', null, 'Kommer du?')),
+      rsvpButtons(t)),
+    h('div', {class:'tblock'},
+      h('div', {class:'tblock-head'}, h('b', null, yes.length + ' kommer'), h('button', {type:'button', class:'linkbtn', onclick:() => pickPeopleSheet(t)}, '+ Inviter')),
+      yes.length ? h('div', {class:'who-list'}, yes.map(id => h('span', {class:'who-item'}, face(id, true), id === S.me ? 'Du' : nameOf(id)))) : null,
+      others.map(([l, list]) => h('p', {class:'who-rest'}, h('span', null, l + ': '), list.map(id => id === S.me ? 'du' : nameOf(id)).join(', ')))),
+    h('div', {class:'tfoot'}, inviteLinkBox(t.id, 'Bli med: ' + (t.title || 'treff')), treffDanger(t)));
+  openSheet(
+    h('div', {class:'thead'},
+      h('span', {class:'treff-k'}, planType(t).label),
+      h('h2', null, t.title || 'Treff'),
+      h('div', {class:'tfacts'},
+        h('span', {class:'tfact'}, h('span', {svg:ICONS.cal, 'aria-hidden':'true'}), treffWhen(t, true)),
+        t.place ? h('span', {class:'tfact'}, h('span', {svg:ICONS.pin, 'aria-hidden':'true'}),
+          h('a', {href: safeUrl(t.mapUrl) || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(t.place), target:'_blank', rel:'noopener'}, t.place)) : null),
+      h('button', {type:'button', class:'tedit', onclick:() => treffForm(t)}, 'Endre')),
+    h('div', {class:'ttabs', role:'tablist'}, tabBtn('info', 'Info'), bring ? tabBtn('ta', 'Ta med', bc.all ? bc.taken + '/' + bc.all : null) : null, tabBtn('chat', 'Chat', unread || null)),
+    body);
 }
 function treffDanger(t){
   const box = h('div', {class:'dangerzone'});
@@ -1897,7 +1918,8 @@ function treffDanger(t){
       sheet.close(); toast(owner ? 'Treffet er slettet' : 'Du er ikke lenger med'); S.trips = S.trips.filter(x => x.id !== t.id); render();
     } catch(e){ toast(e.message); }
   }});
-  const label = t.createdBy === S.me ? 'Avlys treffet' : 'Ikke vis meg dette treffet';
+  const noun = subOf(t) === 'arrangement' ? 'arrangementet' : 'treffet';
+  const label = (t.createdBy === S.me ? 'Avlys ' : 'Forlat ') + noun;
   b.textContent = label;
   box.append(b);
   return box;
