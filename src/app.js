@@ -1800,12 +1800,13 @@ async function inviteSheet(reset){
 const isTreff = t => t && t.kind === 'treff';
 // Hva slags plan: alle unntatt tur lagres som treff med en undertype
 const PLAN_TYPES = [
-  {id:'treff', label:'Treff', icon:'chat', desc:'Middag, kaffe, tur i skogen. Dato, sted og Kommer-knapp.'},
-  {id:'fest', label:'Fest hjemme', icon:'cheers', desc:'Julebord, bursdag, vorspiel. Gjester svarer og dere avtaler i chatten.'},
-  {id:'arrangement', label:'Arrangement', icon:'gift', desc:'Utdrikningslag, babyshower. Planlegg sammen uten hovedpersonen.'},
-  {id:'tur', label:'Tur', icon:'flight', desc:'Reise med bookinger, idétavle, pakkeliste, kart og vær.'}
+  {id:'treff', label:'Treff', icon:'chat', desc:'Middag, kaffe, en kveld ute'},
+  {id:'arrangement', label:'Arrangement', icon:'cheers', desc:'Fest, bursdag, utdrikningslag. Med liste over hvem som tar med hva'},
+  {id:'tur', label:'Tur', icon:'flight', desc:'Reise med bookinger og plan'}
 ];
-const planType = t => PLAN_TYPES.find(p => p.id === (t && t.sub)) || PLAN_TYPES[0];
+// «fest» fra før regnes som arrangement
+const subOf = t => (t && (t.sub === 'fest' ? 'arrangement' : t.sub)) || 'treff';
+const planType = t => PLAN_TYPES.find(p => p.id === subOf(t)) || PLAN_TYPES[0];
 function createSheet(){
   openSheet(h('h2', null, 'Hva vil du lage?'),
     h('div', {class:'typegrid'}, PLAN_TYPES.map(p => h('button', {type:'button', class:'typecard type-' + p.id, onclick:() => p.id === 'tur' ? newTripSheet() : treffForm(null, p.id)},
@@ -1852,7 +1853,7 @@ function treffCard(t){
     h('div', {class:'treff-t'}, t.title || 'Treff'),
     t.place ? h('div', {class:'treff-m'}, t.place) : null,
     h('div', {class:'treff-who'}, coming.length ? h('span', {class:'faces'}, coming.slice(0, 6).map(id => face(id, true))) : null, h('span', null, rsvpSummary(t)), chatButton(t.id, t.title, 'chatmini')),
-    hasBring(t) && bringCount(t.id).all ? (c => h('div', {class:'bringprog'}, h('span', null, 'Hvem tar med hva: ' + c.taken + ' av ' + c.all + ' tatt'), h('span', {class:'bar'}, h('i', {style:'width:' + Math.round(c.taken / c.all * 100) + '%'})))) (bringCount(t.id)) : null,
+    hasBring(t) && bringCount(t.id).all ? (c => h('div', {class:'bringprog'}, h('span', null, c.taken + ' av ' + c.all + ' ting tatt'), h('span', {class:'bar'}, h('i', {style:'width:' + Math.round(c.taken / c.all * 100) + '%'})))) (bringCount(t.id)) : null,
     rsvpButtons(t));
 }
 function inviteLinkBox(tid, label){
@@ -1881,7 +1882,7 @@ function treffSheet(tid){
       h('button', {type:'button', class:'btn primary', onclick:() => pickPeopleSheet(t)}, 'Inviter flere'),
       inviteLinkBox(t.id, 'Bli med: ' + (t.title || 'treff')),
       h('button', {type:'button', class:'btn ghost', onclick:() => treffForm(t)}, 'Endre')),
-    hasBring(t) ? [h('h3', {class:'sheet-sub'}, 'Hvem tar med hva'), bringBox(t)] : null,
+    hasBring(t) ? [h('h3', {class:'sheet-sub'}, 'Ta med'), bringBox(t)] : null,
     h('h3', {class:'sheet-sub'}, 'Chat'), chatBox(t.id),
     treffDanger(t));
 }
@@ -1943,17 +1944,16 @@ async function friendsSheet(){
     try {
       const list = await rpc('search_users', {p_q: v});
       results.replaceChildren(h('h3', {class:'sheet-sub'}, 'Treff på Yaffle'),
-        list.length ? h('div', {class:'people'}, list.map(p => row(p, 'search'))) : h('p', {class:'muted'}, 'Fant ingen. Har de ikke Yaffle ennå? Send dem en invitasjon under.'));
+        list.length ? h('div', {class:'people'}, list.map(p => row(p, 'search'))) : h('p', {class:'muted'}, 'Fant ingen.'));
     } catch(e){ results.replaceChildren(h('p', {class:'muted'}, e.message)); }
   };
   q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 300); });
   const draw = () => {
     const fr = S.friends || [];
     const favs = fr.filter(p => p.favorite), rest = fr.filter(p => !p.favorite);
-    favBox.replaceChildren(h('h3', {class:'sheet-sub'}, 'Favoritter'), favs.length ? h('div', {class:'people'}, favs.map(p => row(p))) : h('p', {class:'muted'}, fr.length ? 'Trykk ★ på dem du planlegger mest med.' : ''));
-    allBox.replaceChildren(h('h3', {class:'sheet-sub'}, favs.length ? 'Alle andre venner' : 'Venner'), rest.length ? h('div', {class:'people'}, rest.map(p => row(p))) : h('p', {class:'muted'}, fr.length ? 'Alle vennene dine er favoritter.' : 'Ingen venner ennå. Søk dem opp over, eller del en lenke.'));
+    favBox.replaceChildren(h('h3', {class:'sheet-sub'}, 'Favoritter'), favs.length ? h('div', {class:'people'}, favs.map(p => row(p))) : h('p', {class:'muted'}, fr.length ? 'Trykk ★ for å gjøre noen til favoritt.' : ''));
+    allBox.replaceChildren(h('h3', {class:'sheet-sub'}, favs.length ? 'Alle andre venner' : 'Venner'), rest.length ? h('div', {class:'people'}, rest.map(p => row(p))) : h('p', {class:'muted'}, fr.length ? 'Alle vennene dine er favoritter.' : 'Ingen venner ennå.'));
     groupBox.replaceChildren(h('h3', {class:'sheet-sub'}, 'Gjenger'),
-      h('p', {class:'muted', style:'margin:0 0 8px;font-size:13px'}, 'Lagre faste grupper, så velger du alle med ett trykk når du lager et treff.'),
       ...(S.groups || []).map(g => h('button', {type:'button', class:'groupcard', onclick:() => groupSheet(g)}, h('b', null, g.name), h('span', null, g.members.map(id => nameOf(id)).join(', ') || 'Ingen ennå'))),
       h('button', {type:'button', class:'addcard', onclick:() => groupSheet(null)}, h('b', null, '+'), 'Ny gjeng'));
   };
@@ -1977,7 +1977,7 @@ function friendChips(selected, onChange){
       }),
       ...fr.map(p => h('button', {type:'button', class:'pickchip', 'aria-pressed': String(selected.has(p.id)), onclick:() => { selected.has(p.id) ? selected.delete(p.id) : selected.add(p.id); draw(); onChange && onChange(); }},
         personFace(p), (p.favorite ? '★ ' : '') + p.nick)));
-    if (!fr.length) wrap.append(h('p', {class:'muted', style:'margin:0'}, 'Du har ingen venner i Yaffle ennå. Legg dem til under Venner, eller del en invitasjonslenke etterpå.'));
+    if (!fr.length) wrap.append(h('p', {class:'muted', style:'margin:0'}, 'Ingen venner ennå. Legg dem til under Venner.'));
   };
   draw();
   return wrap;
@@ -2005,7 +2005,7 @@ async function pickPeopleSheet(t){
   const upd = () => { const n = [...sel].filter(id => !already.has(id)).length; btn.textContent = n ? 'Inviter ' + n : 'Velg hvem'; };
   btn.onclick = async () => {
     const ids = [...sel].filter(id => !already.has(id)); if (!ids.length) return;
-    try { await rpc('add_trip_members', {p_trip: t.id, p_users: ids}); toast('Invitert! De ser treffet neste gang de åpner Yaffle.'); refreshTripMembers(t.id); treffSheet(t.id); } catch(e){ toast(e.message); }
+    try { await rpc('add_trip_members', {p_trip: t.id, p_users: ids}); toast('Invitert'); refreshTripMembers(t.id); treffSheet(t.id); } catch(e){ toast(e.message); }
   };
   (S.friends || []).forEach(p => { if (already.has(p.id)) sel.add(p.id); });
   openSheet(h('h2', null, 'Inviter flere'), friendChips(sel, upd), h('div', {class:'actions'}, h('span'), btn));
@@ -2016,11 +2016,11 @@ function refreshTripMembers(tid){
   S.rdb.collection('trips/' + tid + '/members').get ? S.rdb.collection('trips/' + tid + '/members').get().then(m => { S.tripMembers[tid] = m.docs.map(d => d.id); render(); }).catch(() => {}) : null;
 }
 async function treffForm(t, sub){
-  sub = (t && t.sub) || sub || 'treff';
+  sub = t ? subOf(t) : (sub || 'treff');
   const pt = PLAN_TYPES.find(p => p.id === sub) || PLAN_TYPES[0];
   await loadFriends();
   const today = new Date(); const iso = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-  const ph = {treff:'F.eks. Middag hos Tara', fest:'F.eks. Julebord hos Frida', arrangement:'F.eks. Utdrikningslag for Ida'}[sub];
+  const ph = {treff:'F.eks. Middag hos Tara', arrangement:'F.eks. Julebord hos Frida'}[sub];
   const title = h('input', {class:'input', value: t ? t.title || '' : '', placeholder: ph, maxlength:'60'});
   const date = h('input', {class:'input', type:'date', value: t ? t.start || '' : '', min: t ? null : iso});
   const time = h('input', {class:'input', type:'time', value: t ? t.time || '' : '19:00'});
@@ -2028,7 +2028,7 @@ async function treffForm(t, sub){
   const info = h('textarea', {class:'input', placeholder:'Ta med noe? Kleskode? Skriv det her.', maxlength:'600'}, t ? t.info || '' : '');
   const sel = new Set();
   const btn = h('button', {class:'btn primary', type:'submit'}, t ? 'Lagre' : 'Send invitasjon');
-  const noun = {treff:'treffet', fest:'festen', arrangement:'arrangementet'}[sub];
+  const noun = {treff:'treffet', arrangement:'arrangementet'}[sub];
   const upd = () => { if (!t) btn.textContent = sel.size ? 'Send til ' + sel.size + (sel.size === 1 ? ' venn' : ' venner') : 'Lag ' + noun; };
   const form = h('form', {class:'form', onsubmit: async e => {
     e.preventDefault();
@@ -2042,7 +2042,7 @@ async function treffForm(t, sub){
       await rpc('update_trip', {p_trip: id, p_data: data});
       if (sel.size) await rpc('add_trip_members', {p_trip: id, p_users: [...sel]});
       try { await S.rdb.doc('trips/' + id + '/rsvp/' + S.me).set({answer:'yes', at: Date.now()}); } catch(_){}
-      sheet.close(); toast(sel.size ? 'Invitasjonen er sendt' : cap(noun) + ' er laget. Trykk på det for å invitere folk.');
+      sheet.close(); toast(sel.size ? 'Invitasjonen er sendt' : cap(noun) + ' er laget');
     } catch(err){ toast(err.message); }
     finally { btn.disabled = false; }
   }},
@@ -2052,8 +2052,7 @@ async function treffForm(t, sub){
     field('Info', 't-info', info),
     t ? null : h('div', {class:'field'}, h('label', null, 'Hvem'), friendChips(sel, upd)),
     h('div', {class:'actions'}, h('span'), btn));
-  openSheet(h('h2', null, (t ? 'Endre ' : 'Ny' + (sub === 'treff' ? 'tt ' : ' ')) + pt.label.toLowerCase()),
-    sub === 'arrangement' && !t ? h('p', {class:'muted', style:'margin:-4px 0 12px;font-size:14px'}, 'Ikke inviter hovedpersonen, så er planleggingen hemmelig.') : null,
+  openSheet(h('h2', null, (t ? 'Endre ' : 'Nytt ') + pt.label.toLowerCase()),
     form);
   upd();
 }
@@ -2067,12 +2066,12 @@ async function calendarSheet(reset){
   const webcal = https.replace(/^https?:/, 'webcal:');
   const google = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal);
   openSheet(h('h2', null, 'Yaffle i kalenderen'),
-    h('p', null, 'Abonner én gang, så dukker treff og turer du er med på opp i kalenderen din av seg selv. Endringer kommer automatisk. Treff du har sagt nei til, vises ikke.'),
+    h('p', null, 'Abonner én gang, så kommer treff og turer inn i kalenderen din av seg selv.'),
     h('div', {class:'cal-btns'},
       h('a', {class:'btn primary', href: webcal}, 'iPhone / Mac-kalender'),
       h('a', {class:'btn ghost', href: google, target:'_blank', rel:'noopener'}, 'Google Kalender'),
       h('button', {type:'button', class:'btn ghost', onclick: async () => { try { await navigator.clipboard.writeText(https); toast('Lenken er kopiert'); } catch(e){ toast(https); } }}, 'Kopier lenke')),
-    h('p', {class:'muted', style:'font-size:13px;margin-top:14px'}, 'Lenken er personlig. Del den ikke. Har den kommet på avveie, lag en ny, så slutter den gamle å virke. Kalenderapper oppdaterer abonnementer noen ganger i timen, så nye treff kan bruke litt tid på å dukke opp.'),
+    h('p', {class:'muted', style:'font-size:13px;margin-top:14px'}, 'Lenken er personlig.'),
     h('button', {type:'button', class:'linkbtn', onclick:() => calendarSheet(true)}, 'Lag ny lenke'));
 }
 
@@ -2144,19 +2143,19 @@ function chatButton(tid, title, cls){
 
 /* ---------- hvem tar med hva (fest og arrangement) ---------- */
 const bringViews = {};
-const hasBring = t => isTreff(t) && (t.sub === 'fest' || t.sub === 'arrangement' || (S.bring[t.id] || []).length);
+const hasBring = t => isTreff(t) && subOf(t) === 'arrangement';
 function bringCount(tid){ const l = S.bring[tid] || []; return {all: l.length, taken: l.filter(x => x.takenBy).length}; }
 function bringBox(t){
   const tid = t.id;
   const list = h('div', {class:'bringlist'});
-  const inp = h('input', {class:'input', placeholder:'F.eks. Dessert, isbiter, høyttaler …', maxlength:'80', 'aria-label':'Ny ting å ta med'});
+  const inp = h('input', {class:'input', placeholder:'Hva trengs?', maxlength:'80', 'aria-label':'Ny ting å ta med'});
   const draw = () => {
     if (!list.isConnected && list.dataset.drawn){ delete bringViews[tid]; return; }
     list.dataset.drawn = '1';
     const items = (S.bring[tid] || []).slice().sort((a, b) => (a.at || 0) - (b.at || 0));
     const c = bringCount(tid);
     list.replaceChildren(
-      items.length ? h('p', {class:'bring-sum'}, c.taken + ' av ' + c.all + ' er tatt') : h('p', {class:'muted', style:'margin:0'}, 'Lag en liste over det som trengs, så kan folk huke av det de tar med.'),
+      items.length ? h('p', {class:'bring-sum'}, c.taken + ' av ' + c.all + ' er tatt') : null,
       ...items.map(it => {
         const mine = it.takenBy === S.me, taken = !!it.takenBy;
         let armed = false;
@@ -2173,7 +2172,7 @@ function bringBox(t){
               catch(e){ toast('Fikk ikke lagret. Prøv igjen.'); }
             }}, mine ? '✓' : ''),
           h('div', {class:'bringtxt'}, h('b', null, it.text),
-            taken ? h('span', {class:'bringwho'}, face(it.takenBy, true), mine ? 'Du tar med' : nameOf(it.takenBy) + ' tar med') : h('span', {class:'bringfree'}, 'Ledig, trykk for å ta den')),
+            taken ? h('span', {class:'bringwho'}, face(it.takenBy, true), mine ? 'Du tar med' : nameOf(it.takenBy) + ' tar med') : h('span', {class:'bringfree'}, 'Ledig')),
           del);
       }));
   };
