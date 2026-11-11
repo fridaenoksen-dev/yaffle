@@ -1809,8 +1809,11 @@ const PLAN_TYPES = [
 // «fest» fra før regnes som arrangement
 const subOf = t => (t && (t.sub === 'fest' ? 'arrangement' : t.sub)) || 'treff';
 const planType = t => PLAN_TYPES.find(p => p.id === subOf(t)) || PLAN_TYPES[0];
-const organizerOf = t => t && t.createdBy ? String(t.createdBy) : null;
-const isOrganizer = t => !organizerOf(t) || organizerOf(t) === S.me;
+// Arrangører: kan endre detaljer og tekster. Standard er den som laget det.
+const organizersOf = t => !t ? [] : Array.isArray(t.organizers) && t.organizers.length ? t.organizers.map(String) : t.createdBy ? [String(t.createdBy)] : [];
+const organizerOf = t => organizersOf(t)[0] || null;
+const isOrganizer = t => !organizersOf(t).length || organizersOf(t).includes(S.me);
+const orgNames = t => { const n = organizersOf(t).map(id => id === S.me ? 'deg' : nameOf(id)); return n.length < 3 ? n.join(' og ') : n.slice(0, -1).join(', ') + ' og ' + n[n.length - 1]; };
 function createSheet(){
   openSheet(h('h2', null, 'Hva vil du lage?'),
     h('div', {class:'typegrid'}, PLAN_TYPES.map(p => h('button', {type:'button', class:'typecard type-' + p.id, onclick:() => p.id === 'tur' ? newTripSheet() : treffForm(null, p.id)},
@@ -1905,7 +1908,7 @@ function treffSheet(tid, tab){
         h('span', {class:'tfact'}, h('span', {svg:ICONS.cal, 'aria-hidden':'true'}), treffWhen(t, true)),
         t.place ? h('span', {class:'tfact'}, h('span', {svg:ICONS.pin, 'aria-hidden':'true'}),
           h('a', {href: safeUrl(t.mapUrl) || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(t.place), target:'_blank', rel:'noopener'}, t.place)) : null,
-        organizerOf(t) ? h('span', {class:'tfact'}, face(organizerOf(t), true), h('span', null, h('span', {class:'muted'}, 'Arrangør: '), organizerOf(t) === S.me ? 'deg' : nameOf(organizerOf(t)))) : null),
+        organizersOf(t).length ? h('span', {class:'tfact'}, h('span', {class:'faces'}, organizersOf(t).slice(0, 4).map(id => face(id, true))), h('span', null, h('span', {class:'muted'}, organizersOf(t).length > 1 ? 'Arrangører: ' : 'Arrangør: '), orgNames(t))) : null),
       isOrganizer(t) ? h('button', {type:'button', class:'tedit', onclick:() => treffForm(t)}, 'Endre') : null),
     h('div', {class:'ttabs', role:'tablist'}, tabBtn('info', 'Info'), bring ? tabBtn('ta', 'Ta med', bc.all ? bc.taken + '/' + bc.all : null) : null, tabBtn('chat', 'Chat', unread || null)),
     body);
@@ -2052,6 +2055,12 @@ async function treffForm(t, sub){
   const place = h('input', {class:'input', value: t ? t.place || '' : '', placeholder:'Hjemme hos noen, en restaurant …', maxlength:'120'});
   const info = h('textarea', {class:'input', placeholder:'Ta med noe? Kleskode? Skriv det her.', maxlength:'600'}, t ? t.info || '' : '');
   const sel = new Set();
+  const orgs = new Set(organizersOf(t));
+  const orgPick = h('div', {class:'pick'});
+  const drawOrg = () => orgPick.replaceChildren(...(t ? (S.tripMembers[t.id] || []) : []).map(id => h('button', {type:'button', class:'pickchip', 'aria-pressed': String(orgs.has(id)),
+    onclick:() => { if (orgs.has(id) && orgs.size === 1){ toast('Det må være minst én arrangør.'); return; } orgs.has(id) ? orgs.delete(id) : orgs.add(id); drawOrg(); }},
+    face(id, true), id === S.me ? 'Deg' : nameOf(id))));
+  drawOrg();
   const btn = h('button', {class:'btn primary', type:'submit'}, t ? 'Lagre' : 'Send invitasjon');
   const noun = {treff:'treffet', arrangement:'arrangementet'}[sub];
   const upd = () => { if (!t) btn.textContent = sel.size ? 'Send til ' + sel.size + (sel.size === 1 ? ' venn' : ' venner') : 'Lag ' + noun; };
@@ -2062,7 +2071,8 @@ async function treffForm(t, sub){
     btn.disabled = true;
     const data = {kind:'treff', sub, title:title.value.trim(), start:date.value, end:date.value, time:time.value || '', place:place.value.trim(), info:info.value.trim()};
     try {
-      if (t){ await rpc('update_trip', {p_trip: t.id, p_data: data}); toast('Lagret'); treffSheet(t.id); return; }
+      if (t){ data.organizers = [...orgs]; await rpc('update_trip', {p_trip: t.id, p_data: data}); Object.assign(t, data); toast('Lagret'); render(); treffSheet(t.id); return; }
+      data.organizers = [S.me];
       const id = await rpc('create_trip', {p_title: data.title, p_note: '', p_start: data.start, p_end: data.end});
       await rpc('update_trip', {p_trip: id, p_data: data});
       if (sel.size) await rpc('add_trip_members', {p_trip: id, p_users: [...sel]});
@@ -2076,6 +2086,7 @@ async function treffForm(t, sub){
     field('Hvor', 't-where', place),
     field('Info', 't-info', info),
     t ? null : h('div', {class:'field'}, h('label', null, 'Hvem'), friendChips(sel, upd)),
+    t ? h('div', {class:'field'}, h('label', null, 'Arrangører'), orgPick) : null,
     h('div', {class:'actions'}, h('span'), btn));
   openSheet(h('h2', null, (t ? 'Endre ' : 'Nytt ') + pt.label.toLowerCase()),
     form);
@@ -2172,7 +2183,7 @@ const hasBring = t => isTreff(t) && subOf(t) === 'arrangement';
 function bringCount(tid){ const l = S.bring[tid] || []; return {all: l.length, taken: l.filter(x => x.takenBy).length}; }
 function bringNote(t){
   const txt = (t.bringNote || '').trim();
-  if (!isOrganizer(t)) return txt ? h('div', {class:'tnote orgnote'}, h('span', {class:'orglabel'}, face(organizerOf(t), true), nameOf(organizerOf(t)) + ' skriver'), h('p', null, txt)) : null;
+  if (!isOrganizer(t)) return txt ? h('div', {class:'tnote orgnote'}, h('span', {class:'orglabel'}, h('span', {class:'faces'}, organizersOf(t).slice(0, 3).map(id => face(id, true))), 'Fra ' + orgNames(t)), h('p', null, txt)) : null;
   const ta = h('textarea', {class:'input', rows:'3', maxlength:'800', placeholder:'Skriv til gjestene, f.eks. «Alle tar med noe til buffeten»', 'aria-label':'Melding fra arrangøren'});
   ta.value = txt;
   const save = h('button', {type:'button', class:'btn primary sm', onclick: async () => {
@@ -2180,7 +2191,7 @@ function bringNote(t){
     try { await rpc('update_trip', {p_trip: t.id, p_data: {bringNote: ta.value.trim()}}); t.bringNote = ta.value.trim(); toast('Lagret'); }
     catch(e){ toast(e.message); } finally { save.disabled = false; }
   }}, 'Lagre');
-  return h('div', {class:'orgedit'}, h('label', {class:'orglabel'}, 'Til gjestene (bare du kan endre)'), ta, h('div', {style:'display:flex;justify-content:flex-end'}, save));
+  return h('div', {class:'orgedit'}, h('label', {class:'orglabel'}, 'Til gjestene (bare arrangører kan endre)'), ta, h('div', {style:'display:flex;justify-content:flex-end'}, save));
 }
 function bringBox(t){
   const tid = t.id;
