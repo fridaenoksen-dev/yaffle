@@ -89,7 +89,7 @@ const S = {
   packing:[], personal:{}, prep:{}, loaded:{trip:false, items:false, ideas:false, members:false}, confirmed:false, timedOut:false, noDb:false,
   view: (h => h === 'papirer' ? 'penger' : ['plan','ideer','pakk','penger','hjem'].includes(h) ? h : 'plan')(location.hash.slice(1)),
   tripId: null, trips:[], profileDocs:{}, memberDocs:{}, tripMembers:{}, homeTab:'next',
-  filter:'all', boardMode:'tavle', rsvp:{}, chat:{}, chatSubs:{}, bring:{}, friends:null, groups:null, pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
+  filter:'all', boardMode:'tavle', rsvp:{}, chat:{}, chatSubs:{}, bring:{}, polls:{}, friends:null, groups:null, pending:new Set(), joined:false, skipNick:false, flash:new Set(), prevAllIn:null
 };
 try { S.skipNick = sessionStorage.getItem('yaffle-skip-nick') === '1'; } catch(e){}
 
@@ -175,6 +175,7 @@ render();
       S.tripMembers[t.id] = [];
       db.collection('trips/' + t.id + '/members').onSnapshot(m => { S.tripMembers[t.id] = m.docs.map(d => d.id); render(); }, () => {});
       if (isTreff(t)) db.collection('trips/' + t.id + '/rsvp').onSnapshot(r => { S.rsvp[t.id] = Object.fromEntries(r.docs.map(d => [d.id, (d.data() || {}).answer])); render(); }, () => {});
+      if (isTreff(t)) db.collection('trips/' + t.id + '/polls').onSnapshot(r => { S.polls[t.id] = r.docs.map(d => ({id:d.id, ...d.data()})); if (pollViews[t.id]) pollViews[t.id](); }, () => {});
       if (isTreff(t)) db.collection('trips/' + t.id + '/bring').onSnapshot(r => { S.bring[t.id] = r.docs.map(d => ({id:d.id, ...d.data()})); if (bringViews[t.id]) bringViews[t.id](); render(); }, () => {});
     }
     S.loaded.trips = true; render();
@@ -1854,8 +1855,10 @@ function rsvpButtons(t){
 function treffCard(t){
   const ids = S.tripMembers[t.id] || [], a = answersOf(t.id);
   const coming = ids.filter(id => a[id] === 'yes');
-  return h('article', {class:'treffcard', tabindex:'0', role:'button', 'aria-label': (t.title || 'Treff') + ', ' + treffWhen(t, true),
+  const cover = treffCover(t);
+  return h('article', {class:'treffcard' + (cover ? ' has-img' : ''), tabindex:'0', role:'button', 'aria-label': (t.title || 'Treff') + ', ' + treffWhen(t, true),
       onclick:() => treffSheet(t.id, 'info'), onkeydown: e => { if (e.key === 'Enter') treffSheet(t.id, 'info'); }},
+    cover ? h('img', {class:'treff-img', src:cover, alt:'', loading:'lazy', referrerpolicy:'no-referrer', onerror: e => e.target.remove()}) : null,
     h('div', {class:'treff-k'}, planType(t).label + ' · ' + treffWhen(t)),
     h('div', {class:'treff-t'}, t.title || 'Treff'),
     t.place ? h('div', {class:'treff-m'}, t.place) : null,
@@ -1878,9 +1881,9 @@ function inviteLinkBox(tid, label){
 function treffSheet(tid, tab){
   const t = S.trips.find(x => x.id === tid); if (!t) return;
   const ids = S.tripMembers[t.id] || [], a = answersOf(t.id);
-  const bring = hasBring(t);
+  const bring = hasBring(t), polls = hasPolls(t);
   tab = tab || S.treffTab || 'info';
-  if (tab === 'ta' && !bring) tab = 'info';
+  if ((tab === 'ta' && !bring) || (tab === 'polls' && !polls)) tab = 'info';
   S.treffTab = tab;
   const who = k => ids.filter(id => k ? a[id] === k : !a[id]);
   const yes = who('yes');
@@ -1890,6 +1893,7 @@ function treffSheet(tid, tab){
   let body;
   if (tab === 'chat') body = chatBox(t.id);
   else if (tab === 'ta') body = h('div', {class:'tinfo'}, bringNote(t), bringBox(t));
+  else if (tab === 'polls') body = pollsBox(t);
   else body = h('div', {class:'tinfo'},
     t.info ? h('p', {class:'tnote'}, t.info) : null,
     h('div', {class:'tblock'},
@@ -1900,7 +1904,9 @@ function treffSheet(tid, tab){
       yes.length ? h('div', {class:'who-list'}, yes.map(id => h('span', {class:'who-item'}, face(id, true), id === S.me ? 'Du' : nameOf(id)))) : null,
       others.map(([l, list]) => h('p', {class:'who-rest'}, h('span', null, l + ': '), list.map(id => id === S.me ? 'du' : nameOf(id)).join(', ')))),
     h('div', {class:'tfoot'}, inviteLinkBox(t.id, 'Bli med: ' + (t.title || 'treff')), treffDanger(t)));
+  const cover = treffCover(t);
   openSheet(
+    cover ? h('img', {class:'tcover', src:cover, alt:'', referrerpolicy:'no-referrer', onerror: e => e.target.remove()}) : null,
     h('div', {class:'thead'},
       h('span', {class:'treff-k'}, planType(t).label),
       h('h2', null, t.title || 'Treff'),
@@ -1910,7 +1916,7 @@ function treffSheet(tid, tab){
           h('a', {href: safeUrl(t.mapUrl) || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(t.place), target:'_blank', rel:'noopener'}, t.place)) : null,
         organizersOf(t).length ? h('span', {class:'tfact'}, h('span', {class:'faces'}, organizersOf(t).slice(0, 4).map(id => face(id, true))), h('span', null, h('span', {class:'muted'}, organizersOf(t).length > 1 ? 'Arrangører: ' : 'Arrangør: '), orgNames(t))) : null),
       isOrganizer(t) ? h('button', {type:'button', class:'tedit', onclick:() => treffForm(t)}, 'Endre') : null),
-    h('div', {class:'ttabs', role:'tablist'}, tabBtn('info', 'Info'), bring ? tabBtn('ta', 'Ta med', bc.all ? bc.taken + '/' + bc.all : null) : null, tabBtn('chat', 'Chat', unread || null)),
+    h('div', {class:'ttabs', role:'tablist'}, tabBtn('info', 'Info'), bring ? tabBtn('ta', 'Ta med', bc.all ? bc.taken + '/' + bc.all : null) : null, polls ? tabBtn('polls', 'Stem', (S.polls[t.id] || []).filter(p => !((p.votes || {})[S.me] || []).length).length || null) : null, tabBtn('chat', 'Chat', unread || null)),
     body);
 }
 function treffDanger(t){
@@ -2056,6 +2062,26 @@ async function treffForm(t, sub){
   const info = h('textarea', {class:'input', placeholder:'Ta med noe? Kleskode? Skriv det her.', maxlength:'600'}, t ? t.info || '' : '');
   const sel = new Set();
   const orgs = new Set(organizersOf(t));
+  const mods = {...modsOf(t || {sub})};
+  const modRow = h('div', {class:'pick'});
+  const drawMods = () => modRow.replaceChildren(...[['bring', 'Ta med-liste'], ['polls', 'Avstemning']].map(([k, l]) =>
+    h('button', {type:'button', class:'pickchip group', 'aria-pressed': String(!!mods[k]), onclick:() => { mods[k] = !mods[k]; drawMods(); }}, (mods[k] ? '✓ ' : '+ ') + l)));
+  drawMods();
+  let coverId = t ? t.cover || null : null, coverFile = null;
+  const prev = h('span', {class:'photo-pick'});
+  const showPrev = () => prev.replaceChildren(coverFile ? h('img', {src: URL.createObjectURL(coverFile), alt:''}) : coverId && blobUrl(coverId) ? h('img', {src: blobUrl(coverId), alt:''}) : '');
+  showPrev();
+  const coverInput = h('input', {type:'file', accept:'image/png,image/jpeg,image/webp', onchange: async ev => {
+    const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+    try { coverFile = await resizeImage(f, 1600); } catch(e){ coverFile = f; }
+    showPrev(); coverLbl.lastChild.textContent = 'Bytt bilde';
+  }});
+  const coverLbl = h('label', {class:'attach'}, coverInput, h('span', {svg:ICONS.clip, style:'display:inline-flex'}), document.createTextNode(coverId ? 'Bytt bilde' : 'Legg til bilde'));
+  const uploadCover = async tid => {
+    if (!coverFile || !S.assets) return coverId;
+    const r = await S.assets.upload(coverFile, {type:'image/jpeg', folder: tid});
+    return r.id;
+  };
   const orgPick = h('div', {class:'pick'});
   const drawOrg = () => orgPick.replaceChildren(...(t ? (S.tripMembers[t.id] || []) : []).map(id => h('button', {type:'button', class:'pickchip', 'aria-pressed': String(orgs.has(id)),
     onclick:() => { if (orgs.has(id) && orgs.size === 1){ toast('Det må være minst én arrangør.'); return; } orgs.has(id) ? orgs.delete(id) : orgs.add(id); drawOrg(); }},
@@ -2071,9 +2097,11 @@ async function treffForm(t, sub){
     btn.disabled = true;
     const data = {kind:'treff', sub, title:title.value.trim(), start:date.value, end:date.value, time:time.value || '', place:place.value.trim(), info:info.value.trim()};
     try {
-      if (t){ data.organizers = [...orgs]; await rpc('update_trip', {p_trip: t.id, p_data: data}); Object.assign(t, data); toast('Lagret'); render(); treffSheet(t.id); return; }
+      data.modules = {bring: !!mods.bring, polls: !!mods.polls};
+      if (t){ data.organizers = [...orgs]; data.cover = await uploadCover(t.id); await rpc('update_trip', {p_trip: t.id, p_data: data}); Object.assign(t, data); toast('Lagret'); render(); treffSheet(t.id); return; }
       data.organizers = [S.me];
       const id = await rpc('create_trip', {p_title: data.title, p_note: '', p_start: data.start, p_end: data.end});
+      try { data.cover = await uploadCover(id); } catch(e){ toast('Fikk ikke lastet opp bildet, men resten er lagret.'); }
       await rpc('update_trip', {p_trip: id, p_data: data});
       if (sel.size) await rpc('add_trip_members', {p_trip: id, p_users: [...sel]});
       try { await S.rdb.doc('trips/' + id + '/rsvp/' + S.me).set({answer:'yes', at: Date.now()}); } catch(_){}
@@ -2086,6 +2114,9 @@ async function treffForm(t, sub){
     field('Hvor', 't-where', place),
     field('Info', 't-info', info),
     t ? null : h('div', {class:'field'}, h('label', null, 'Hvem'), friendChips(sel, upd)),
+    h('div', {class:'field'}, h('label', null, 'Bilde'), h('div', {class:'photo-pick'}, prev, coverLbl,
+      (coverId || coverFile) ? h('button', {type:'button', class:'linkbtn', onclick:() => { coverId = null; coverFile = null; showPrev(); }}, 'Fjern') : null)),
+    h('div', {class:'field'}, h('label', null, 'Moduler'), modRow),
     t ? h('div', {class:'field'}, h('label', null, 'Arrangører'), orgPick) : null,
     h('div', {class:'actions'}, h('span'), btn));
   openSheet(h('h2', null, (t ? 'Endre ' : 'Nytt ') + pt.label.toLowerCase()),
@@ -2179,7 +2210,7 @@ function chatButton(tid, title, cls){
 
 /* ---------- hvem tar med hva (fest og arrangement) ---------- */
 const bringViews = {};
-const hasBring = t => isTreff(t) && subOf(t) === 'arrangement';
+const hasBring = t => isTreff(t) && !!modsOf(t).bring;
 function bringCount(tid){ const l = S.bring[tid] || []; return {all: l.length, taken: l.filter(x => x.takenBy).length}; }
 function bringNote(t){
   const txt = (t.bringNote || '').trim();
@@ -2236,6 +2267,85 @@ function bringBox(t){
   setTimeout(draw, 0);
   return h('section', {class:'bringbox', 'aria-label':'Hvem tar med hva'}, list,
     h('div', {class:'quickadd', style:'margin-top:10px'}, inp, h('button', {type:'button', class:'btn dark', onclick:add}, 'Legg til')));
+}
+
+/* ---------- moduler: ta med og avstemning ---------- */
+// t.modules = {bring, polls}. Arrangement har «Ta med» på fra start.
+const modsOf = t => ({bring: subOf(t) === 'arrangement', polls: false, ...(t && t.modules || {})});
+const hasPolls = t => isTreff(t) && !!modsOf(t).polls;
+const pollViews = {};
+function treffCover(t){
+  if (t.cover){ const u = blobUrl(t.cover); if (u) return u; }
+  return safeUrl(t.coverUrl) || null;
+}
+function pollsBox(t){
+  const tid = t.id;
+  const wrap = h('div', {class:'polls'});
+  const draw = () => {
+    if (!wrap.isConnected && wrap.dataset.drawn){ delete pollViews[tid]; return; }
+    wrap.dataset.drawn = '1';
+    const polls = (S.polls[tid] || []).slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+    wrap.replaceChildren(
+      ...polls.map(p => pollCard(t, p)),
+      isOrganizer(t) ? h('button', {type:'button', class:'addcard', onclick:() => pollForm(t)}, h('b', null, '+'), 'Ny avstemning')
+        : polls.length ? null : h('p', {class:'muted'}, 'Ingen avstemninger ennå.'));
+  };
+  pollViews[tid] = draw;
+  setTimeout(draw, 0);
+  return wrap;
+}
+function pollCard(t, p){
+  const votes = p.votes || {};
+  const voters = Object.keys(votes).filter(id => (votes[id] || []).length);
+  const mine = new Set(votes[S.me] || []);
+  const count = oid => voters.filter(id => (votes[id] || []).includes(oid));
+  const max = Math.max(0, ...(p.options || []).map(o => count(o.id).length));
+  const vote = async oid => {
+    let next;
+    if (p.multi){ next = new Set(mine); next.has(oid) ? next.delete(oid) : next.add(oid); next = [...next]; }
+    else next = mine.has(oid) ? [] : [oid];
+    p.votes = {...votes, [S.me]: next};
+    if (pollViews[t.id]) pollViews[t.id]();
+    try { await S.rdb.doc('trips/' + t.id + '/polls/' + p.id).update({votes: {[S.me]: next}}); }
+    catch(e){ toast('Fikk ikke lagret stemmen. Prøv igjen.'); }
+  };
+  let armed = false;
+  const del = isOrganizer(t) ? h('button', {type:'button', class:'iconlink', 'aria-label':'Slett avstemningen', onclick: async () => {
+    if (!armed){ armed = true; del.textContent = 'Slett?'; setTimeout(() => { armed = false; del.textContent = '×'; }, 3000); return; }
+    try { await S.rdb.doc('trips/' + t.id + '/polls/' + p.id).delete(); } catch(e){ toast('Fikk ikke slettet.'); }
+  }}, '×') : null;
+  return h('div', {class:'pollcard'},
+    h('div', {class:'poll-head'}, h('b', null, p.question), del),
+    h('p', {class:'poll-sub'}, (p.multi ? 'Velg så mange du vil' : 'Velg én') + ' · ' + voters.length + ' har stemt'),
+    h('div', {class:'poll-opts'}, (p.options || []).map(o => {
+      const who = count(o.id), on = mine.has(o.id), lead = max > 0 && who.length === max;
+      return h('button', {type:'button', class:'poll-opt' + (on ? ' on' : '') + (lead ? ' lead' : ''), 'aria-pressed': String(on), onclick:() => vote(o.id)},
+        h('span', {class:'poll-fill', style:'width:' + (voters.length ? Math.round(who.length / voters.length * 100) : 0) + '%'}),
+        h('span', {class:'poll-check', 'aria-hidden':'true'}, on ? '✓' : ''),
+        h('span', {class:'poll-txt'}, o.text),
+        h('span', {class:'poll-who'}, who.length ? h('span', {class:'faces'}, who.slice(0, 4).map(id => face(id, true))) : null, h('b', null, who.length)));
+    })));
+}
+function pollForm(t){
+  const q = h('input', {class:'input', placeholder:'F.eks. Hva skal vi spise?', maxlength:'120'});
+  const opts = h('div', {class:'poll-edit'});
+  const addOpt = v => { const i = h('input', {class:'input', placeholder:'Alternativ ' + (opts.children.length + 1), maxlength:'80', value: v || ''}); opts.append(i); return i; };
+  addOpt(); addOpt();
+  let multi = false;
+  const sw = h('button', {type:'button', class:'sw', 'aria-pressed':'false', 'aria-label':'Flere valg', onclick:() => { multi = !multi; sw.setAttribute('aria-pressed', String(multi)); }});
+  const form = h('form', {class:'form', onsubmit: async e => {
+    e.preventDefault();
+    if (!q.value.trim()) return q.focus();
+    const options = [...opts.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean).map((text, k) => ({id: 'o' + k + Date.now().toString(36), text}));
+    if (options.length < 2){ toast('Legg inn minst to alternativer.'); return; }
+    try { await S.rdb.collection('trips/' + t.id + '/polls').doc().set({question: q.value.trim(), options, multi, by: S.me, at: Date.now(), votes: {}}); treffSheet(t.id, 'polls'); }
+    catch(err){ toast('Fikk ikke laget avstemningen.'); }
+  }},
+    field('Spørsmål', 'p-q', q),
+    h('div', {class:'field'}, h('label', null, 'Alternativer'), opts, h('button', {type:'button', class:'linkbtn', style:'justify-self:start;margin-top:4px', onclick:() => addOpt().focus()}, '+ Alternativ')),
+    h('div', {class:'tog'}, h('span', null, 'Flere valg per person'), sw),
+    h('div', {class:'actions'}, h('button', {type:'button', class:'btn ghost', onclick:() => treffSheet(t.id, 'polls')}, 'Avbryt'), h('button', {class:'btn primary', type:'submit'}, 'Lag avstemning')));
+  openSheet(h('h2', null, 'Ny avstemning'), form);
 }
 
 /* ---------- onboarding ---------- */
