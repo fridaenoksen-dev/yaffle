@@ -1809,6 +1809,8 @@ const PLAN_TYPES = [
 // «fest» fra før regnes som arrangement
 const subOf = t => (t && (t.sub === 'fest' ? 'arrangement' : t.sub)) || 'treff';
 const planType = t => PLAN_TYPES.find(p => p.id === subOf(t)) || PLAN_TYPES[0];
+const organizerOf = t => t && t.createdBy ? String(t.createdBy) : null;
+const isOrganizer = t => !organizerOf(t) || organizerOf(t) === S.me;
 function createSheet(){
   openSheet(h('h2', null, 'Hva vil du lage?'),
     h('div', {class:'typegrid'}, PLAN_TYPES.map(p => h('button', {type:'button', class:'typecard type-' + p.id, onclick:() => p.id === 'tur' ? newTripSheet() : treffForm(null, p.id)},
@@ -1884,7 +1886,7 @@ function treffSheet(tid, tab){
   const tabBtn = (id, label, badge) => h('button', {type:'button', role:'tab', 'aria-selected': String(tab === id), onclick:() => treffSheet(tid, id)}, label, badge ? h('b', {class:'tabbadge'}, badge) : null);
   let body;
   if (tab === 'chat') body = chatBox(t.id);
-  else if (tab === 'ta') body = bringBox(t);
+  else if (tab === 'ta') body = h('div', {class:'tinfo'}, bringNote(t), bringBox(t));
   else body = h('div', {class:'tinfo'},
     t.info ? h('p', {class:'tnote'}, t.info) : null,
     h('div', {class:'tblock'},
@@ -1902,8 +1904,9 @@ function treffSheet(tid, tab){
       h('div', {class:'tfacts'},
         h('span', {class:'tfact'}, h('span', {svg:ICONS.cal, 'aria-hidden':'true'}), treffWhen(t, true)),
         t.place ? h('span', {class:'tfact'}, h('span', {svg:ICONS.pin, 'aria-hidden':'true'}),
-          h('a', {href: safeUrl(t.mapUrl) || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(t.place), target:'_blank', rel:'noopener'}, t.place)) : null),
-      h('button', {type:'button', class:'tedit', onclick:() => treffForm(t)}, 'Endre')),
+          h('a', {href: safeUrl(t.mapUrl) || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(t.place), target:'_blank', rel:'noopener'}, t.place)) : null,
+        organizerOf(t) ? h('span', {class:'tfact'}, face(organizerOf(t), true), h('span', null, h('span', {class:'muted'}, 'Arrangør: '), organizerOf(t) === S.me ? 'deg' : nameOf(organizerOf(t)))) : null),
+      isOrganizer(t) ? h('button', {type:'button', class:'tedit', onclick:() => treffForm(t)}, 'Endre') : null),
     h('div', {class:'ttabs', role:'tablist'}, tabBtn('info', 'Info'), bring ? tabBtn('ta', 'Ta med', bc.all ? bc.taken + '/' + bc.all : null) : null, tabBtn('chat', 'Chat', unread || null)),
     body);
 }
@@ -2167,6 +2170,18 @@ function chatButton(tid, title, cls){
 const bringViews = {};
 const hasBring = t => isTreff(t) && subOf(t) === 'arrangement';
 function bringCount(tid){ const l = S.bring[tid] || []; return {all: l.length, taken: l.filter(x => x.takenBy).length}; }
+function bringNote(t){
+  const txt = (t.bringNote || '').trim();
+  if (!isOrganizer(t)) return txt ? h('div', {class:'tnote orgnote'}, h('span', {class:'orglabel'}, face(organizerOf(t), true), nameOf(organizerOf(t)) + ' skriver'), h('p', null, txt)) : null;
+  const ta = h('textarea', {class:'input', rows:'3', maxlength:'800', placeholder:'Skriv til gjestene, f.eks. «Alle tar med noe til buffeten»', 'aria-label':'Melding fra arrangøren'});
+  ta.value = txt;
+  const save = h('button', {type:'button', class:'btn primary sm', onclick: async () => {
+    save.disabled = true;
+    try { await rpc('update_trip', {p_trip: t.id, p_data: {bringNote: ta.value.trim()}}); t.bringNote = ta.value.trim(); toast('Lagret'); }
+    catch(e){ toast(e.message); } finally { save.disabled = false; }
+  }}, 'Lagre');
+  return h('div', {class:'orgedit'}, h('label', {class:'orglabel'}, 'Til gjestene (bare du kan endre)'), ta, h('div', {style:'display:flex;justify-content:flex-end'}, save));
+}
 function bringBox(t){
   const tid = t.id;
   const list = h('div', {class:'bringlist'});
