@@ -909,20 +909,18 @@ textarea.input.chatinput{flex:1;resize:none;height:44px;min-height:44px;max-heig
 .ttabs .tabbadge{padding:1px 6px;font-size:11px}
 @media (max-width:400px){.ttabs button{font-size:13px}.ttabs .tabbadge{padding:0 5px}}
 
-/* ─────────── Velkommen (opening screen) ─────────── */
+/* ─────────── Startside: video og innlogging ─────────── */
 body.has-welcome{background:#fbf4e4}
 body.has-welcome .wrap{max-width:none;margin:0;padding:0}
-.welcome{--w-paper:#fbf4e4;--w-navy:#09426c;position:fixed;inset:0;background:var(--w-paper);z-index:1;color:#2b2b2b;display:flex;justify-content:center}
-.welcome-in{position:relative;width:100%;max-width:480px;height:100%;overflow:hidden}
-.welcome-in video{position:absolute;top:0;left:0;width:100%;height:calc(100dvh - 170px);object-fit:cover;object-position:center 75%;display:block;background:#b8dcee}
-.welcome-fade{position:absolute;left:0;right:0;bottom:0;height:350px;background:linear-gradient(180deg,rgba(251,244,228,0) 0%,rgba(251,244,228,.95) 38%,var(--w-paper) 55%);pointer-events:none}
-.welcome-bottom{position:absolute;left:20px;right:20px;bottom:calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;text-align:center}
-.welcome-bottom h1{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;font-size:54px;line-height:1;letter-spacing:-.01em;color:#2b2b2b}
-.welcome-bottom p{margin:-4px 0 6px;font-family:var(--body);font-size:17px;color:#5d5d5d}
-.welcome-btn{display:block;width:100%;padding:17px;border-radius:9999px;font-family:var(--body);font-size:16px;font-weight:600;border:0}
-.welcome-btn:active{transform:translateY(1px)}
-.welcome-btn.pri{background:var(--w-navy);color:#fff;box-shadow:0 6px 18px -6px rgba(9,66,108,.5)}
-.welcome-btn.sec{background:#fff;color:var(--w-navy);border:1.5px solid rgba(9,66,108,.25)}
+.welcome{--w-paper:#fbf4e4;--w-navy:#09426c;background:var(--w-paper);color:#2b2b2b;display:flex;justify-content:center}
+.welcome-in{position:relative;width:100%;max-width:480px;min-height:100dvh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+.welcome-in video{position:absolute;top:0;left:0;width:100%;height:max(300px,calc(100dvh - 275px));object-fit:cover;object-position:center 85%;display:block;background:#b8dcee}
+.welcome-fade{position:absolute;left:0;right:0;top:max(210px,calc(100dvh - 365px));height:91px;background:linear-gradient(180deg,rgba(251,244,228,0) 0%,var(--w-paper) 100%);pointer-events:none}
+.onboard.welcome-bottom{position:relative;width:100%;max-width:none;margin:0;min-height:0;padding:0 20px calc(22px + env(safe-area-inset-bottom,0px));gap:10px;text-align:center}
+.welcome-bottom h1{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;font-size:50px;line-height:1;letter-spacing:-.01em;color:#2b2b2b}
+.onboard.welcome-bottom p{margin:-4px 0 6px;font-size:17px}
+.onboard.welcome-bottom .btn{margin-top:2px}
+.onboard.welcome-bottom .linkbtn{align-self:center;margin-top:6px;font-size:15px}
 
 /* ─────────── Innlogging, ny konto og venteskjerm (samme stil som velkomsten) ─────────── */
 body:has(.onboard),body:has(.loading){background:#fbf4e4}
@@ -948,6 +946,6 @@ body:has(.onboard),body:has(.loading){background:#fbf4e4}
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261114c"></script>
+<script type="module" src="./src/runtime.js?v=20261114d"></script>
 </body>
 </html>

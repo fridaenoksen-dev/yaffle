@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261114c";
+import * as CONFIG from "./config.js?v=20261114d";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
@@ -86,27 +86,15 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 /* ---------- login screens ---------- */
 // Invitasjonskode fra lenken (?bli-med=KODE) huskes til man er logget inn.
 const INVITE_KEY = "yaffle-invite";
-// Velkomstskjermen vises én gang per enhet, så returnerende går rett til innlogging.
-const WELCOMED_KEY = "yaffle-welcomed";
-const welcomed = () => { try { return localStorage.getItem(WELCOMED_KEY) === "1"; } catch (e) { return false; } };
-const markWelcomed = () => { try { localStorage.setItem(WELCOMED_KEY, "1"); } catch (e) {} };
-
-function welcomeScreen() {
+// Startsiden: video øverst og innlogging rett på siden. Ny konto har egen side.
+function startPage(form) {
   document.body.classList.add("has-welcome");
   const v = document.createElement("video");
   v.src = "/brand/welcome/yaffle-splash.mp4";
   v.poster = "/brand/welcome/hero-poster.jpg";
   v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
   v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true");
-  const go = (mode) => () => { markWelcomed(); loginScreen(null, mode); };
-  app.replaceChildren(h("div", { class: "welcome" }, h("div", { class: "welcome-in" },
-    v,
-    h("div", { class: "welcome-fade" }),
-    h("div", { class: "welcome-bottom" },
-      h("h1", null, "Yaffle"),
-      h("p", null, "Planlegg sammen."),
-      h("button", { class: "welcome-btn pri", type: "button", onclick: go("signup") }, "Kom i gang"),
-      h("button", { class: "welcome-btn sec", type: "button", onclick: go("login") }, "Jeg har allerede en konto")))));
+  app.replaceChildren(h("div", { class: "welcome" }, h("div", { class: "welcome-in" }, v, h("div", { class: "welcome-fade" }), form)));
 }
 function loadingScreen() {
   const v = document.createElement("video");
@@ -168,9 +156,16 @@ function loginScreen(note, mode) {
     signup ? name : null, email, pass, show, btn,
     h("button", { type: "button", class: "linkbtn", style: "margin-top:12px;align-self:flex-start", onclick: () => loginScreen(null, signup ? "login" : "signup") },
       signup ? "Har du konto? Logg inn" : "Ny her? Lag konto"));
-  const back = pendingInvite() ? brand() : h("div", { class: "authtop" }, h("button", { class: "authback", type: "button", "aria-label": "Tilbake", onclick: () => welcomeScreen() }, "←"));
+  if (!signup) {
+    if (!note && !pendingInvite()) msg.textContent = "Planlegg sammen.";
+    form.className = "onboard welcome-bottom"; form.removeAttribute("style");
+    form.replaceChildren(h("h1", null, "Yaffle"), msg, email, pass, btn,
+      h("button", { type: "button", class: "linkbtn", onclick: () => loginScreen(null, "signup") }, "Ny her? Lag konto"));
+    return startPage(form);
+  }
+  const back = h("div", { class: "authtop" }, h("button", { class: "authback", type: "button", "aria-label": "Tilbake", onclick: () => loginScreen(null, "login") }, "←"));
   app.replaceChildren(back, form);
-  setTimeout(() => (signup ? name : email).focus(), 50);
+  setTimeout(() => name.focus(), 50);
 }
 
 // Lar hver person bytte fra passordet de fikk til sitt eget.
@@ -639,14 +634,13 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261114c");
+  await import("./app.js?v=20261114d");
 }
 
 const {
   data: { session },
 } = await sb.auth.getSession();
 if (session) start(session);
-else if (!pendingInvite() && !welcomed()) welcomeScreen();
 else loginScreen();
 sb.auth.onAuthStateChange((event, s) => {
   if (event === "SIGNED_IN" && s) start(s);
