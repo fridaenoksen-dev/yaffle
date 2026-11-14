@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261114a";
+import * as CONFIG from "./config.js?v=20261114b";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
@@ -93,28 +93,20 @@ const markWelcomed = () => { try { localStorage.setItem(WELCOMED_KEY, "1"); } ca
 
 function welcomeScreen() {
   document.body.classList.add("has-welcome");
-  const hero = h("div", { class: "welcome-hero" },
-    (() => {
-      const v = document.createElement("video");
-      v.src = "/brand/welcome/yaffle-splash.mp4";
-      v.poster = "/brand/welcome/hero-poster.jpg";
-      v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
-      v.setAttribute("muted", ""); v.setAttribute("playsinline", "");
-      v.setAttribute("aria-hidden", "true");
-      return v;
-    })());
-  const nav = h("div", { class: "welcome-nav" },
-    h("span", { class: "welcome-wordmark" }, h("span", { class: "dot", "aria-hidden": "true" }), "Yaffle"),
-    h("a", { class: "welcome-login", href: "#", onclick: (e) => { e.preventDefault(); markWelcomed(); leaveWelcome(); loginScreen(null, "login"); } }, "Logg inn"));
-  const h1 = document.createElement("h1");
-  h1.innerHTML = "Planlegg <em>sammen</em>.";
-  const body = h("div", { class: "welcome-body" },
-    h1,
-    h("p", null, "For gjengen din."),
-    h("button", { class: "welcome-cta", type: "button", onclick: () => { markWelcomed(); leaveWelcome(); loginScreen(null, "signup"); } },
-      "Kom i gang ", h("span", { class: "arrow", "aria-hidden": "true" }, "→")));
-  const screen = h("div", { class: "welcome" }, hero, nav, body);
-  app.replaceChildren(screen);
+  const v = document.createElement("video");
+  v.src = "/brand/welcome/yaffle-splash.mp4";
+  v.poster = "/brand/welcome/hero-poster.jpg";
+  v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+  v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true");
+  const go = (mode) => () => { markWelcomed(); loginScreen(null, mode); };
+  app.replaceChildren(h("div", { class: "welcome" }, h("div", { class: "welcome-in" },
+    v,
+    h("div", { class: "welcome-fade" }),
+    h("div", { class: "welcome-bottom" },
+      h("h1", null, "Yaffle"),
+      h("p", null, "Planlegg sammen."),
+      h("button", { class: "welcome-btn pri", type: "button", onclick: go("signup") }, "Kom i gang"),
+      h("button", { class: "welcome-btn sec", type: "button", onclick: go("login") }, "Jeg har allerede en konto")))));
 }
 function leaveWelcome() { document.body.classList.remove("has-welcome"); }
 (() => {
@@ -641,7 +633,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261114a");
+  await import("./app.js?v=20261114b");
 }
 
 const {
