@@ -923,12 +923,31 @@ body.has-welcome .wrap{max-width:none;margin:0;padding:0}
 .welcome-btn:active{transform:translateY(1px)}
 .welcome-btn.pri{background:var(--w-navy);color:#fff;box-shadow:0 6px 18px -6px rgba(9,66,108,.5)}
 .welcome-btn.sec{background:#fff;color:var(--w-navy);border:1.5px solid rgba(9,66,108,.25)}
+
+/* ─────────── Innlogging, ny konto og venteskjerm (samme stil som velkomsten) ─────────── */
+body:has(.onboard),body:has(.loading){background:#fbf4e4}
+.onboard{color:#2b2b2b;min-height:0;justify-content:flex-start;padding-top:28px}
+.authtop{display:flex;min-height:44px;align-items:center}
+.onboard h2{font-family:'Cormorant Garamond',Georgia,serif!important;font-weight:500!important;font-size:42px;line-height:1;letter-spacing:-.01em!important;color:#2b2b2b;margin:0 0 10px}
+.onboard p{color:#5d5d5d;font-size:16px;margin:0 0 8px}
+.onboard p b{color:#2b2b2b!important}
+.onboard .input{background:#fff;color:#2b2b2b;border-radius:14px;padding:15px 16px;box-shadow:inset 0 0 0 1.5px rgba(9,66,108,.16)}
+.onboard .input::placeholder{color:#a1a1a1}
+.onboard .input:focus{outline:none;box-shadow:inset 0 0 0 2px #09426c}
+.onboard .btn{width:100%;margin-top:12px;padding:17px;border-radius:9999px;font-size:16px;font-weight:600}
+.onboard .btn.dark,.onboard .btn.primary{background:#09426c;color:#fff;box-shadow:0 6px 18px -6px rgba(9,66,108,.5)}
+.onboard .btn.ghost{background:#fff;color:#09426c;box-shadow:inset 0 0 0 1.5px rgba(9,66,108,.25)}
+.onboard .linkbtn{color:#09426c!important}
+.authback{border:0;background:none;padding:8px 8px 8px 0;font-size:26px;line-height:1;color:#7d7d7d}
+.loading{position:fixed;inset:0;background:#fbf4e4;display:grid;place-items:center;z-index:1}
+.loading video{width:min(64vw,260px);aspect-ratio:1;display:block;-webkit-mask-image:radial-gradient(circle,#000 48%,transparent 70%);mask-image:radial-gradient(circle,#000 48%,transparent 70%)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
 </head>
 <body>
 <div class="wrap" id="app" aria-live="polite"></div>
 <dialog class="sheet" id="sheet" aria-label="Detaljer"><div class="sheet-head"><div class="grab" aria-hidden="true"></div><button class="close" id="sheetClose" type="button" aria-label="Lukk">×</button></div><div class="sheet-in" id="sheetBody"></div></dialog>
 
-<script type="module" src="./src/runtime.js?v=20261114b"></script>
+<script type="module" src="./src/runtime.js?v=20261114c"></script>
 </body>
 </html>

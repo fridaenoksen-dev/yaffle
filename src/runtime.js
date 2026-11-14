@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261114b";
+import * as CONFIG from "./config.js?v=20261114c";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
@@ -108,6 +108,14 @@ function welcomeScreen() {
       h("button", { class: "welcome-btn pri", type: "button", onclick: go("signup") }, "Kom i gang"),
       h("button", { class: "welcome-btn sec", type: "button", onclick: go("login") }, "Jeg har allerede en konto")))));
 }
+function loadingScreen() {
+  const v = document.createElement("video");
+  v.src = "/brand/welcome/yaffle-loading.mp4";
+  v.poster = "/brand/welcome/loading-poster.jpg";
+  v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+  v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true");
+  return h("div", { class: "loading", role: "status" }, v, h("span", { class: "sr" }, "Laster …"));
+}
 function leaveWelcome() { document.body.classList.remove("has-welcome"); }
 (() => {
   const code = new URLSearchParams(location.search).get("bli-med");
@@ -160,7 +168,8 @@ function loginScreen(note, mode) {
     signup ? name : null, email, pass, show, btn,
     h("button", { type: "button", class: "linkbtn", style: "margin-top:12px;align-self:flex-start", onclick: () => loginScreen(null, signup ? "login" : "signup") },
       signup ? "Har du konto? Logg inn" : "Ny her? Lag konto"));
-  app.replaceChildren(brand(), form);
+  const back = pendingInvite() ? brand() : h("div", { class: "authtop" }, h("button", { class: "authback", type: "button", "aria-label": "Tilbake", onclick: () => welcomeScreen() }, "←"));
+  app.replaceChildren(back, form);
   setTimeout(() => (signup ? name : email).focus(), 50);
 }
 
@@ -570,10 +579,7 @@ async function start(session) {
   if (started) return;
   started = true;
   leaveWelcome();
-  app.replaceChildren(
-    brand(),
-    h("p", { class: "muted", style: "margin-top:60px" }, "Henter turen …"),
-  );
+  app.replaceChildren(loadingScreen());
   // Godta invitasjon fra lenken
   const code = pendingInvite();
   if (code) {
@@ -633,7 +639,7 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261114b");
+  await import("./app.js?v=20261114c");
 }
 
 const {
