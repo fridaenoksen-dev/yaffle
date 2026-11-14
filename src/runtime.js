@@ -2,7 +2,7 @@
 // (window.claude.use('db' | 'user' | 'assets')). Swapping Claude's built-in
 // storage for Supabase here means src/app.js stays almost unchanged.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
-import * as CONFIG from "./config.js?v=20261111j";
+import * as CONFIG from "./config.js?v=20261114a";
 const { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } = CONFIG;
 
 // Logo: Vaffelplan er standard. Veiskille kan testes fra profilen (lagres bare på denne enheten).
@@ -86,6 +86,37 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 /* ---------- login screens ---------- */
 // Invitasjonskode fra lenken (?bli-med=KODE) huskes til man er logget inn.
 const INVITE_KEY = "yaffle-invite";
+// Velkomstskjermen vises én gang per enhet, så returnerende går rett til innlogging.
+const WELCOMED_KEY = "yaffle-welcomed";
+const welcomed = () => { try { return localStorage.getItem(WELCOMED_KEY) === "1"; } catch (e) { return false; } };
+const markWelcomed = () => { try { localStorage.setItem(WELCOMED_KEY, "1"); } catch (e) {} };
+
+function welcomeScreen() {
+  document.body.classList.add("has-welcome");
+  const hero = h("div", { class: "welcome-hero" },
+    (() => {
+      const v = document.createElement("video");
+      v.src = "/brand/welcome/yaffle-splash.mp4";
+      v.poster = "/brand/welcome/hero-poster.jpg";
+      v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+      v.setAttribute("muted", ""); v.setAttribute("playsinline", "");
+      v.setAttribute("aria-hidden", "true");
+      return v;
+    })());
+  const nav = h("div", { class: "welcome-nav" },
+    h("span", { class: "welcome-wordmark" }, h("span", { class: "dot", "aria-hidden": "true" }), "Yaffle"),
+    h("a", { class: "welcome-login", href: "#", onclick: (e) => { e.preventDefault(); markWelcomed(); leaveWelcome(); loginScreen(null, "login"); } }, "Logg inn"));
+  const h1 = document.createElement("h1");
+  h1.innerHTML = "Planlegg <em>sammen</em>.";
+  const body = h("div", { class: "welcome-body" },
+    h1,
+    h("p", null, "For gjengen din."),
+    h("button", { class: "welcome-cta", type: "button", onclick: () => { markWelcomed(); leaveWelcome(); loginScreen(null, "signup"); } },
+      "Kom i gang ", h("span", { class: "arrow", "aria-hidden": "true" }, "→")));
+  const screen = h("div", { class: "welcome" }, hero, nav, body);
+  app.replaceChildren(screen);
+}
+function leaveWelcome() { document.body.classList.remove("has-welcome"); }
 (() => {
   const code = new URLSearchParams(location.search).get("bli-med");
   if (code) { try { sessionStorage.setItem(INVITE_KEY, code); } catch (e) {} }
@@ -93,6 +124,7 @@ const INVITE_KEY = "yaffle-invite";
 const pendingInvite = () => { try { return sessionStorage.getItem(INVITE_KEY); } catch (e) { return null; } };
 
 function loginScreen(note, mode) {
+  leaveWelcome();
   mode = mode || (pendingInvite() ? "signup" : "login");
   const signup = mode === "signup";
   const name = h("input", { class: "input", id: "login-name", autocomplete: "given-name", placeholder: "Fornavn", maxlength: "24", "aria-label": "Fornavn" });
@@ -545,6 +577,7 @@ let alert_msg = null;
 async function start(session) {
   if (started) return;
   started = true;
+  leaveWelcome();
   app.replaceChildren(
     brand(),
     h("p", { class: "muted", style: "margin-top:60px" }, "Henter turen …"),
@@ -608,13 +641,14 @@ async function start(session) {
             ? assets
             : null,
   };
-  await import("./app.js?v=20261111j");
+  await import("./app.js?v=20261114a");
 }
 
 const {
   data: { session },
 } = await sb.auth.getSession();
 if (session) start(session);
+else if (!pendingInvite() && !welcomed()) welcomeScreen();
 else loginScreen();
 sb.auth.onAuthStateChange((event, s) => {
   if (event === "SIGNED_IN" && s) start(s);
